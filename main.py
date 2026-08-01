@@ -1,6 +1,11 @@
 import argparse
-import sys
 import os
+import queue
+import subprocess
+import sys
+import threading
+import time
+import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -10,6 +15,51 @@ from interfaces.web import run_web_mode
 from core.diagnostics import build_diagnostic_report, print_diagnostic_report
 from core.printers.setup_service import configure_printer_binding
 from core.printers.tsc_connector import TSCPrinterConnector
+
+
+def launch_https_tunnel(port: int, timeout_seconds: float = 20.0):
+    """Launch localtunnel and return its process and verified HTTPS URL."""
+    tunnel_process = subprocess.Popen(
+        ["npx", "-y", "localtunnel", "--port", str(port)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    output_lines: queue.Queue[str] = queue.Queue()
+
+    def read_output() -> None:
+        if tunnel_process.stdout is None:
+            return
+        for line in tunnel_process.stdout:
+            output_lines.put(line)
+
+    threading.Thread(target=read_output, daemon=True).start()
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        try:
+            line = output_lines.get(timeout=min(0.25, deadline - time.monotonic()))
+        except queue.Empty:
+            if tunnel_process.poll() is not None:
+                break
+            continue
+        print(line, end="")
+        if "your url is:" not in line.lower():
+            continue
+        public_url = line.split("is:", 1)[-1].strip()
+        if urllib.parse.urlsplit(public_url).scheme.lower() == "https":
+            return tunnel_process, public_url
+        break
+
+    tunnel_process.terminate()
+    try:
+        tunnel_process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        tunnel_process.kill()
+    raise RuntimeError(
+        "Could not establish a verified HTTPS tunnel. "
+        "Phone camera mode was not started."
+    )
+
 
 def main():
     parser = argparse.ArgumentParser(description="Universal Warranty Lookup & Label Printer Application")
@@ -59,25 +109,12 @@ def main():
     if args.mode == "web":
         pub_url = args.public_url
         tunnel_proc = None
+        if pub_url and urllib.parse.urlsplit(pub_url).scheme.lower() != "https":
+            parser.error("--public-url must use HTTPS for phone camera access")
         if args.tunnel and not pub_url:
-            import subprocess
-            import time
             print(f"\n[TUNNEL] Launching public HTTPS tunnel on port {args.port}...")
-            tunnel_proc = subprocess.Popen(
-                ["npx", "-y", "localtunnel", "--port", str(args.port)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
-            start_time = time.time()
-            while time.time() - start_time < 10:
-                if tunnel_proc.stdout:
-                    line = tunnel_proc.stdout.readline()
-                    if "your url is:" in line.lower():
-                        pub_url = line.split("is:")[-1].strip()
-                        print(f"[TUNNEL READY] Public URL: {pub_url}\n")
-                        break
-                time.sleep(0.1)
+            tunnel_proc, pub_url = launch_https_tunnel(args.port)
+            print(f"[TUNNEL READY] Public URL: {pub_url}\n")
 
         try:
             run_web_mode(port=args.port, public_url=pub_url)

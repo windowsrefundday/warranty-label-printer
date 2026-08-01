@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from core.app_paths import get_app_paths
 from core.label_formatters.plain_text import PlainTextLabelFormatter
-from core.models import AssetRecord, PrintJobResult
+from core.models import AssetRecord, EERecord, PrintJobResult
 from core.printers.base import BasePrinterConnector
 
 
@@ -37,6 +37,27 @@ class FilePrinterConnector(BasePrinterConnector):
         try:
             with open(file_path, "w", encoding="utf-8") as handle:
                 handle.write(label_content)
+            return PrintJobResult(
+                success=True,
+                printer_name="Virtual_File_Printer",
+                output_path=file_path,
+            )
+        except OSError as exc:
+            return PrintJobResult(
+                success=False,
+                printer_name="Virtual_File_Printer",
+                error_message=str(exc),
+            )
+
+    def print_ee_label(
+        self,
+        record: EERecord,
+        printer_name: Optional[str] = None,
+    ) -> PrintJobResult:
+        file_path = os.path.join(self.output_dir, f"LABEL_EE_{record.ee_number}.txt")
+        try:
+            with open(file_path, "w", encoding="utf-8") as handle:
+                handle.write(PlainTextLabelFormatter.format_ee_label(record))
             return PrintJobResult(
                 success=True,
                 printer_name="Virtual_File_Printer",

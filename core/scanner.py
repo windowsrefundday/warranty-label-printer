@@ -2,6 +2,16 @@ import re
 from core.models import VendorType
 
 class BarcodeScannerParser:
+    _EE_NUMBER_RE = re.compile(r"^\s*558[\s-]*EE[\s-]*([0-9]{1,20})\s*$", re.IGNORECASE)
+
+    @classmethod
+    def parse_ee_number(cls, raw_input: str) -> str | None:
+        """Return the numeric suffix from an anchored internal ``558 EE`` scan."""
+        if not raw_input:
+            return None
+        match = cls._EE_NUMBER_RE.fullmatch(raw_input)
+        return match.group(1) if match else None
+
     @staticmethod
     def clean_barcode(raw_input: str) -> str:
         """Sanitizes raw barcode input from USB scanner, stripping non-printable characters."""

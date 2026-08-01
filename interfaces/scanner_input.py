@@ -87,11 +87,9 @@ def _read_posix_scanner() -> str:
         import tty
 
         fd = sys.stdin.fileno()
-        # Resolve POSIX-only attributes dynamically so Windows type checking
-        # does not need to provide stubs for terminal control APIs.
-        old_settings = getattr(termios, "tcgetattr")(fd)
+        old_settings = termios.tcgetattr(fd)
         try:
-            getattr(tty, "setcbreak")(fd)
+            tty.setcbreak(fd)
             while True:
                 readable, _, _ = select.select([sys.stdin], [], [], 0.12 if buffer else None)
                 if readable:
@@ -114,8 +112,6 @@ def _read_posix_scanner() -> str:
                     print()
                     return "".join(buffer).strip()
         finally:
-            getattr(termios, "tcsetattr")(
-                fd, getattr(termios, "TCSADRAIN"), old_settings
-            )
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     except Exception:
         return input().strip()

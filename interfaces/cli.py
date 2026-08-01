@@ -40,6 +40,18 @@ def run_cli_mode(initial_connector: str | None = None):
                 if command_result == "handled":
                     continue
                 play_scan_beep()
+                ee_record = engine.parse_ee_scan(raw_input)
+                if ee_record is not None:
+                    print("\n" + PlainTextLabelFormatter.format_ee_terminal(ee_record))
+                    result = engine.print_ee_label(ee_record)
+                    if result.success and result.output_path:
+                        print(f"[LABEL SAVED] Virtual EE label created at: {result.output_path}\n")
+                    elif result.success:
+                        print(f"[LABEL PRINTED] EE number sent to: {result.printer_name}\n")
+                    else:
+                        print(f"[LABEL BLOCKED] {result.error_message}\n")
+                    continue
+
                 started = time.perf_counter()
 
                 def show_progress(stage: str, percent: int) -> None:

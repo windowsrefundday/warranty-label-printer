@@ -1,4 +1,4 @@
-from core.models import AssetRecord
+from core.models import AssetRecord, EERecord
 
 class PlainTextLabelFormatter:
     """Formats structured asset records into physical thermal label layouts and colored terminal output."""
@@ -7,6 +7,25 @@ class PlainTextLabelFormatter:
     RESET = "\033[0m"
     GREEN = "\033[1;32m"
     AMBER = "\033[1;33m"
+
+    @staticmethod
+    def format_ee_terminal(record: EERecord) -> str:
+        border = "=" * 42
+        return f"""{border}
+  INTERNAL EE LABEL
+{border}
+
+              {record.ee_number}
+
+{border}
+SCAN DATE: {record.timestamp}
+{border}
+"""
+
+    @staticmethod
+    def format_ee_label(record: EERecord) -> str:
+        """Plain-text virtual output containing only the printable EE suffix."""
+        return f"{record.ee_number}\n"
 
     @classmethod
     def format_terminal_label(cls, asset: AssetRecord) -> str:

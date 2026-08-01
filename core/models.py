@@ -12,7 +12,7 @@ class VendorType(str, Enum):
 
 class SourceConfidence(str, Enum):
     VERIFIED_LIVE = "VERIFIED LIVE (Vendor Portal)"
-    CACHED_REGISTRY = "VERIFIED CACHE (Vendor Data)"
+    CACHED_REGISTRY = "VERIFIED REGISTRY (Internal Database)"
     UNVERIFIED_FAILED = "UNVERIFIED (Lookup Failed)"
 
 @dataclass
@@ -35,6 +35,14 @@ class AssetRecord:
     raw_source: str = "System Registry"
     source_verified_at: Optional[str] = None
     lookup_error: Optional[str] = None
+    timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+@dataclass(frozen=True)
+class EERecord:
+    """An internal EE label request, separate from warranty evidence."""
+
+    ee_number: str
+    raw_code: str
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 @dataclass

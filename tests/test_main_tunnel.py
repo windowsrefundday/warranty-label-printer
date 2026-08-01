@@ -2,7 +2,7 @@ import subprocess
 import unittest
 from unittest import mock
 
-from main import launch_https_tunnel
+from main import LOCAL_TUNNEL_ENTRYPOINT, is_valid_https_url, launch_https_tunnel
 
 
 class HttpsTunnelTests(unittest.TestCase):
@@ -17,12 +17,24 @@ class HttpsTunnelTests(unittest.TestCase):
         self.assertEqual(public_url, "https://scanner.example.test")
         self.assertEqual(
             popen.call_args.args[0],
-            ["npx", "-y", "localtunnel@2.0.2", "--port", "9191"],
+            ["node", LOCAL_TUNNEL_ENTRYPOINT, "--port", "9191"],
         )
+
+    def test_rejects_non_https_url(self):
+        process = mock.MagicMock()
+        process.stdout = iter(["your url is: http://scanner.example.test\n"])
+        process.poll.return_value = None
+
+        with mock.patch("main.subprocess.Popen", return_value=process):
+            with self.assertRaises(RuntimeError):
+                launch_https_tunnel(9191)
+
+        process.terminate.assert_called_once_with()
 
     def test_rejects_https_url_without_hostname(self):
         process = mock.MagicMock()
         process.stdout = iter(["your url is: https:///missing-host\n"])
+        process.poll.return_value = None
 
         with mock.patch("main.subprocess.Popen", return_value=process):
             with self.assertRaises(RuntimeError):
@@ -33,6 +45,7 @@ class HttpsTunnelTests(unittest.TestCase):
     def test_waits_after_killing_stuck_process(self):
         process = mock.MagicMock()
         process.stdout = iter(())
+        process.poll.return_value = None
         process.wait.side_effect = [
             subprocess.TimeoutExpired(cmd="npx", timeout=3),
             0,
@@ -47,6 +60,12 @@ class HttpsTunnelTests(unittest.TestCase):
             process.wait.call_args_list,
             [mock.call(timeout=3), mock.call()],
         )
+
+    def test_url_validator_rejects_malformed_and_hostless_values(self):
+        self.assertFalse(is_valid_https_url("https:///missing-host"))
+        self.assertFalse(is_valid_https_url("https://[malformed"))
+        self.assertFalse(is_valid_https_url("http://scanner.example.test"))
+        self.assertTrue(is_valid_https_url("https://scanner.example.test"))
 
 
 if __name__ == "__main__":

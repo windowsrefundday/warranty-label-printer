@@ -20,7 +20,7 @@ from core.printers.tsc_connector import TSCPrinterConnector
 def launch_https_tunnel(port: int, timeout_seconds: float = 20.0):
     """Launch localtunnel and return its process and verified HTTPS URL."""
     tunnel_process = subprocess.Popen(
-        ["npx", "-y", "localtunnel", "--port", str(port)],
+        ["npx", "-y", "localtunnel@2.0.2", "--port", str(port)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -37,7 +37,9 @@ def launch_https_tunnel(port: int, timeout_seconds: float = 20.0):
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
         try:
-            line = output_lines.get(timeout=min(0.25, deadline - time.monotonic()))
+            line = output_lines.get(
+                timeout=max(0.0, min(0.25, deadline - time.monotonic()))
+            )
         except queue.Empty:
             if tunnel_process.poll() is not None:
                 break

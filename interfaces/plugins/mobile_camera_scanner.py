@@ -99,8 +99,8 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
         .reticle-box {
             position: absolute;
             top: 20%;
-            left: 12%;
-            width: 76%;
+            left: 15%;
+            width: 70%;
             height: 60%;
             border: 2px solid var(--accent);
             border-radius: 12px;
@@ -766,13 +766,10 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                 const btn = document.getElementById('btnSheetPrint');
                 if (btn) btn.textContent = 'Sending to printer...';
                 try {
-                    const res = await fetch(`/api/print`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ serial: this.currentSheetSerial })
-                    });
+                    const res = await fetch(`/api/scan?serial=${encodeURIComponent(this.currentSheetSerial)}&print=true`);
                     const data = await res.json();
-                    if (btn) btn.textContent = data.success ? 'Label Sent Successfully!' : 'Print Error';
+                    const printOk = !!(data.print_result && data.print_result.success);
+                    if (btn) btn.textContent = printOk ? 'Label Sent Successfully!' : 'Print Error';
                 } catch(e) {
                     if (btn) btn.textContent = 'Print Failed';
                 }
@@ -807,13 +804,17 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                     if (sheetVendor) sheetVendor.textContent = data.vendor || 'UNKNOWN';
                     if (sheetStatus) {
                         sheetStatus.textContent = data.status || 'UNVERIFIED';
-                        const isOk = String(data.status).toLowerCase().includes('active') || String(data.status).toLowerCase().includes('valid');
+                        const statusText = String(data.status).toLowerCase();
+                        const isOk = statusText.includes('active') || statusText.includes('valid') || statusText.includes('ready');
                         sheetStatus.className = `badge ${isOk ? 'badge-success' : 'badge-danger'}`;
                     }
                     if (sheetSerial) sheetSerial.textContent = `SN: ${data.serial || serial}`;
                     if (sheetModel) sheetModel.textContent = `${data.vendor || ''} ${data.model || ''}`;
                     if (sheetEnd) sheetEnd.textContent = data.expiration_date || 'N/A';
-                    if (sheetTier) sheetTier.textContent = data.entitlement_type || data.warranty_type || 'Standard Coverage';
+                    const primaryEntitlement = Array.isArray(data.entitlements) && data.entitlements.length > 0
+                        ? data.entitlements[0].service
+                        : null;
+                    if (sheetTier) sheetTier.textContent = primaryEntitlement || 'Standard Coverage';
                     if (printBtn) printBtn.textContent = 'Print 1 Warranty Label';
 
                     if (sheet) sheet.classList.remove('hidden');

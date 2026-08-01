@@ -45,6 +45,15 @@ class EERecord:
     raw_code: str
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
+    def __post_init__(self) -> None:
+        if not (
+            isinstance(self.ee_number, str)
+            and 1 <= len(self.ee_number) <= 20
+            and self.ee_number.isascii()
+            and self.ee_number.isdigit()
+        ):
+            raise ValueError("EERecord.ee_number must contain 1-20 ASCII digits")
+
 @dataclass
 class PrintJobResult:
     success: bool

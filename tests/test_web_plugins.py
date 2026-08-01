@@ -91,6 +91,13 @@ class WebPluginTests(unittest.TestCase):
         self.assertIn("/assets/zxing-browser-0.2.1.min.js", js)
         self.assertIn("window.ZXingBrowser", js)
         self.assertIn("this.zxingCanvas.width", js)
+        self.assertIn("/api/scan?serial=${encodeURIComponent(this.currentSheetSerial)}&print=true", js)
+        self.assertNotIn("fetch(`/api/print`", js)
+        self.assertIn("data.entitlements[0].service", js)
+        self.assertIn("statusText.includes('ready')", js)
+
+        self.assertIn("left: 15%", css)
+        self.assertIn("width: 70%", css)
 
         zxing_asset = (
             WebInterfaceHandler.STATIC_DIRECTORY
@@ -121,7 +128,7 @@ class WebPluginTests(unittest.TestCase):
         if node is None:
             self.skipTest("Node.js is not installed")
         html = WebInterfaceHandler.get_html_page(port=9191)
-        scripts = re.findall(r"<script(?:\\s[^>]*)?>(.*?)</script>", html, re.DOTALL)
+        scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, re.DOTALL)
         inline_scripts = [script for script in scripts if script.strip()]
         result = subprocess.run(
             [node, "--check", "-"],

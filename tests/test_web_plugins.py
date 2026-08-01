@@ -126,7 +126,7 @@ class WebPluginTests(unittest.TestCase):
         result = subprocess.run(
             [node, "--check", "-"],
             input="\n".join(inline_scripts),
-            text=True,
+            encoding="utf-8",
             capture_output=True,
             check=False,
         )

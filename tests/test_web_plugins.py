@@ -95,6 +95,7 @@ class WebPluginTests(unittest.TestCase):
         self.assertNotIn("fetch(`/api/print`", js)
         self.assertIn("data.entitlements[0].service", js)
         self.assertIn("statusText.includes('ready')", js)
+        self.assertIn("mobileManualSerialModal')?.addEventListener('keydown'", js)
 
         self.assertIn("left: 15%", css)
         self.assertIn("width: 70%", css)

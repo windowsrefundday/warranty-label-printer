@@ -48,7 +48,8 @@ def launch_https_tunnel(port: int, timeout_seconds: float = 20.0):
         if "your url is:" not in line.lower():
             continue
         public_url = line.split("is:", 1)[-1].strip()
-        if urllib.parse.urlsplit(public_url).scheme.lower() == "https":
+        parsed_url = urllib.parse.urlsplit(public_url)
+        if parsed_url.scheme.lower() == "https" and parsed_url.hostname:
             return tunnel_process, public_url
         break
 
@@ -57,6 +58,7 @@ def launch_https_tunnel(port: int, timeout_seconds: float = 20.0):
         tunnel_process.wait(timeout=3)
     except subprocess.TimeoutExpired:
         tunnel_process.kill()
+        tunnel_process.wait()
     raise RuntimeError(
         "Could not establish a verified HTTPS tunnel. "
         "Phone camera mode was not started."

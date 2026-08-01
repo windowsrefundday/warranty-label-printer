@@ -510,6 +510,12 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                             this.closeSettingsModal();
                         }
                     });
+                    document.getElementById('mobileManualSerialModal')?.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') {
+                            this.submitManualSerial();
+                            this.closeSettingsModal();
+                        }
+                    });
                 });
             }
 

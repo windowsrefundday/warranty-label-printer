@@ -87,9 +87,13 @@ def _read_posix_scanner() -> str:
         import tty
 
         fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+        tcgetattr = cast(Callable[[int], object], getattr(termios, "tcgetattr"))
+        tcsetattr = cast(Callable[[int, int, object], None], getattr(termios, "tcsetattr"))
+        setcbreak = cast(Callable[[int], None], getattr(tty, "setcbreak"))
+        drain_when_done = cast(int, getattr(termios, "TCSADRAIN"))
+        old_settings = tcgetattr(fd)
         try:
-            tty.setcbreak(fd)
+            setcbreak(fd)
             while True:
                 readable, _, _ = select.select([sys.stdin], [], [], 0.12 if buffer else None)
                 if readable:
@@ -112,6 +116,6 @@ def _read_posix_scanner() -> str:
                     print()
                     return "".join(buffer).strip()
         finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            tcsetattr(fd, drain_when_done, old_settings)
     except Exception:
         return input().strip()

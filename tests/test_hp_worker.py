@@ -161,6 +161,21 @@ class HPBrowserWorkerTests(unittest.TestCase):
         self.assertIsNot(second, preloaded)
         self.assertIsNone(self.worker._preloaded_page)
 
+    def test_startup_failure_returns_explicit_failure_without_hanging(self):
+        with patch.object(
+            self.worker, "_init_browser", side_effect=RuntimeError("no browser")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "no browser"):
+                self.worker.start()
+
+        started = time.monotonic()
+        result = self.worker.fetch_warranty("MXLTEST001")
+
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertEqual(result.source_confidence, SourceConfidence.UNVERIFIED_FAILED)
+        self.assertIn("no browser", result.lookup_error or "")
+        self.assertFalse(self.worker._running)
+
     def test_fresh_cache_hit_returns_immediately_and_schedules_refresh(self):
         record = self._make_record("MXLTEST010", "January 1, 2100", date.today().isoformat())
         self.cache.set(record)

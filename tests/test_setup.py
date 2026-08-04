@@ -161,7 +161,10 @@ class SetupTests(unittest.TestCase):
                     runner=record,
                 )
 
+        self.assertEqual(len(executed), 5)
         self.assertIsNone(executed[0][1])
+        self.assertIsNone(executed[1][1])
+        self.assertIsNone(executed[2][1])
         self.assertEqual(
             executed[3][1],
             {"NODE_EXTRA_CA_CERTS": "C:/certs/corporate.pem"},

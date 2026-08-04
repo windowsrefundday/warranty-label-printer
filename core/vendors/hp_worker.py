@@ -121,6 +121,10 @@ class HPBrowserWorker:
             self._emit_direct(progress_callback, "Verified cache hit", 100)
             self._enqueue_refresh(serial)
             return self._from_cache(cached)
+        if self._startup_error is not None or not self._running:
+            error = str(self._startup_error or "HP browser worker is unavailable")
+            self._emit_direct(progress_callback, "Lookup failed", 100)
+            return self._lookup_failed(serial, error)
         return self._live_lookup(serial, progress_callback)
 
     def enqueue_refresh(self, serial: str) -> None:
@@ -129,6 +133,8 @@ class HPBrowserWorker:
         self._enqueue_refresh(serial)
 
     def _enqueue_refresh(self, serial: str) -> None:
+        if self._startup_error is not None or not self._running:
+            return
         with self._lock:
             if serial in self._in_flight:
                 return
@@ -168,6 +174,8 @@ class HPBrowserWorker:
             self._init_browser()
         except Exception as exc:
             self._startup_error = exc
+            self._running = False
+            self._resolve_pending_failures(f"HP browser startup failed: {exc}")
             self._ready.set()
             return
         self._ready.set()
@@ -180,6 +188,21 @@ class HPBrowserWorker:
             if serial is None:
                 break
             self._process(serial)
+
+    def _resolve_pending_failures(self, error: str) -> None:
+        with self._lock:
+            pending = self._pending
+            callbacks = self._progress_callbacks
+            self._pending = {}
+            self._progress_callbacks = {}
+            self._in_flight.clear()
+        for serial, futures in pending.items():
+            result = self._lookup_failed(serial, error)
+            for callback in callbacks.get(serial, []):
+                self._emit_direct(callback, "Lookup failed", 100)
+            for future in futures:
+                if not future.done():
+                    future.set_result(result)
 
     def _init_browser(self) -> None:
         session = start_browser(
@@ -368,7 +391,7 @@ class HPBrowserWorker:
         return "Active"
 
     @staticmethod
-    def _lookup_failed(serial: str) -> AssetRecord:
+    def _lookup_failed(serial: str, error: Optional[str] = None) -> AssetRecord:
         return AssetRecord(
             serial_number=serial,
             vendor=VendorType.HP,
@@ -379,7 +402,7 @@ class HPBrowserWorker:
             entitlements=[],
             source_confidence=SourceConfidence.UNVERIFIED_FAILED,
             raw_source="HP Warranty Portal Lookup Failed",
-            lookup_error="HP did not return a complete warranty result",
+            lookup_error=error or "HP did not return a complete warranty result",
         )
 
     @staticmethod

@@ -6,6 +6,9 @@ import hashlib
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+import yaml  # pyright: ignore[reportMissingModuleSource, reportMissingTypeStubs]
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +45,43 @@ ABSOLUTE_PATH_PATTERNS = (
 )
 WARRANTY_SERIAL_PATTERN = re.compile(r"\b(?:MXL|MZ)[0-9A-Z]{6,}\b", re.IGNORECASE)
 SYNTHETIC_MARKERS = ("TEST", "SYNTHETIC", "EXAMPLE", "FAKE")
+FULL_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
+DOCKER_DIGEST_PATTERN = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-fA-F]{64}$")
+
+
+def _workflow_action_is_pinned(reference: str) -> bool:
+    """Return whether a workflow action reference is immutable."""
+    if reference.startswith("docker://"):
+        return bool(DOCKER_DIGEST_PATTERN.fullmatch(reference))
+    if "@" not in reference:
+        return False
+    _, revision = reference.rsplit("@", 1)
+    return bool(FULL_ACTION_SHA_PATTERN.fullmatch(revision))
+
+
+def _workflow_action_references(content: str) -> list[str]:
+    """Return every action reference from a parsed workflow document."""
+    document: Any = yaml.safe_load(content)
+    references: list[str] = []
+    seen: set[int] = set()
+    pending: list[Any] = [document]
+
+    while pending:
+        value = pending.pop()
+        if isinstance(value, (dict, list)):
+            identity = id(value)
+            if identity in seen:
+                continue
+            seen.add(identity)
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "uses" and isinstance(child, str):
+                    references.append(child)
+                pending.append(child)
+        elif isinstance(value, list):
+            pending.extend(value)
+
+    return references
 
 
 def audit(root: Path = ROOT) -> list[str]:
@@ -77,6 +117,19 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"secret-like value: {relative}")
         if any(pattern.search(content) for pattern in ABSOLUTE_PATH_PATTERNS):
             failures.append(f"local absolute path: {relative}")
+        if (
+            relative.parts[:2] == (".github", "workflows")
+            and path.suffix.lower() in {".yml", ".yaml"}
+        ):
+            try:
+                references = _workflow_action_references(content)
+            except yaml.YAMLError:
+                failures.append(f"invalid workflow YAML: {relative.as_posix()}")
+                continue
+            for reference in references:
+                if not _workflow_action_is_pinned(reference):
+                    failures.append(f"unpinned workflow action: {relative.as_posix()}")
+                    break
         non_synthetic = [
             value
             for value in WARRANTY_SERIAL_PATTERN.findall(content)

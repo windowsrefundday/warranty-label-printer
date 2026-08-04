@@ -79,3 +79,90 @@ class ReleaseAuditTests(unittest.TestCase):
 
         self.assertEqual(len(failures), 1)
         self.assertIn("package-lock.json", failures[0])
+
+    def test_rejects_unpinned_workflow_action(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workflow = root / ".github" / "workflows" / "test.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                """name: Test
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+""",
+                encoding="utf-8",
+            )
+
+            failures = audit(root)
+
+        self.assertEqual(failures, ["unpinned workflow action: .github/workflows/test.yml"])
+
+    def test_rejects_unpinned_workflow_action_with_quoted_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workflow = root / ".github" / "workflows" / "test.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                """name: Test
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - "uses": actions/checkout@v4
+""",
+                encoding="utf-8",
+            )
+
+            failures = audit(root)
+
+        self.assertEqual(failures, ["unpinned workflow action: .github/workflows/test.yml"])
+
+    def test_handles_recursive_workflow_yaml_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workflow = root / ".github" / "workflows" / "test.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                """name: Test
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - &step
+        uses: actions/checkout@v4
+        recursive: *step
+""",
+                encoding="utf-8",
+            )
+
+            failures = audit(root)
+
+        self.assertEqual(failures, ["unpinned workflow action: .github/workflows/test.yml"])
+
+    def test_accepts_sha_pinned_actions_and_digest_pinned_docker_images(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workflow = root / ".github" / "workflows" / "test.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                """name: Test
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: docker://rhysd/actionlint@sha256:9d36088643581e728c969f35141f88139fec77280b2be23c1f66f8e40e1025e7
+""",
+                encoding="utf-8",
+            )
+
+            failures = audit(root)
+
+        self.assertEqual(failures, [])

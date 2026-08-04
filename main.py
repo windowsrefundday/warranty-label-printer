@@ -1,6 +1,7 @@
 import argparse
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -29,6 +30,7 @@ def is_valid_https_url(value: str) -> bool:
     """Accept only well-formed HTTPS URLs with a hostname."""
     try:
         parsed = urllib.parse.urlsplit(value)
+        _ = parsed.port
         return parsed.scheme.lower() == "https" and bool(parsed.hostname)
     except ValueError:
         return False
@@ -54,53 +56,63 @@ def launch_https_tunnel(port: int, timeout_seconds: float = 20.0):
             "The locked localtunnel runtime is not installed. Run the platform "
             "setup script before using --tunnel."
         )
+    node_executable = shutil.which("node")
+    if node_executable is None:
+        raise RuntimeError(
+            "Node.js was not found on PATH. Run the platform setup script "
+            "before using --tunnel."
+        )
+    launch_finished = threading.Event()
     tunnel_process = subprocess.Popen(
-        ["node", LOCAL_TUNNEL_ENTRYPOINT, "--port", str(port)],
+        [node_executable, LOCAL_TUNNEL_ENTRYPOINT, "--port", str(port)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
     )
-    output_lines: queue.Queue[str] = queue.Queue()
-    reader_finished = threading.Event()
-    launch_finished = threading.Event()
+    tunnel_ready = False
+    try:
+        output_lines: queue.Queue[str] = queue.Queue()
+        reader_finished = threading.Event()
 
-    def read_output() -> None:
-        if tunnel_process.stdout is None:
-            reader_finished.set()
-            return
-        try:
-            for line in tunnel_process.stdout:
-                if not launch_finished.is_set():
-                    output_lines.put(line)
-        finally:
-            reader_finished.set()
+        def read_output() -> None:
+            if tunnel_process.stdout is None:
+                reader_finished.set()
+                return
+            try:
+                for line in tunnel_process.stdout:
+                    if not launch_finished.is_set():
+                        output_lines.put(line)
+            finally:
+                reader_finished.set()
 
-    threading.Thread(target=read_output, daemon=True).start()
-    deadline = time.monotonic() + timeout_seconds
-    while time.monotonic() < deadline:
-        try:
-            line = output_lines.get(
-                timeout=max(0.0, min(0.25, deadline - time.monotonic()))
-            )
-        except queue.Empty:
-            if tunnel_process.poll() is not None and reader_finished.is_set():
-                break
-            continue
-        print(line, end="")
-        if "your url is:" not in line.lower():
-            continue
-        public_url = line.split("is:", 1)[-1].strip()
-        if is_valid_https_url(public_url):
-            launch_finished.set()
-            return tunnel_process, public_url
-        break
+        threading.Thread(target=read_output, daemon=True).start()
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                line = output_lines.get(
+                    timeout=max(0.0, min(0.25, deadline - time.monotonic()))
+                )
+            except queue.Empty:
+                if tunnel_process.poll() is not None and reader_finished.is_set():
+                    break
+                continue
+            print(line, end="")
+            if "your url is:" not in line.lower():
+                continue
+            public_url = line.split("is:", 1)[-1].strip()
+            if is_valid_https_url(public_url):
+                tunnel_ready = True
+                return tunnel_process, public_url
+            break
 
-    launch_finished.set()
-    stop_tunnel_process(tunnel_process)
-    raise RuntimeError(
-        "Could not establish a verified HTTPS tunnel. "
-        "Phone camera mode was not started."
-    )
+        raise RuntimeError(
+            "Could not establish a verified HTTPS tunnel. "
+            "Phone camera mode was not started."
+        )
+    finally:
+        launch_finished.set()
+        if not tunnel_ready:
+            stop_tunnel_process(tunnel_process)
 
 
 def main():

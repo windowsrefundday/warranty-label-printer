@@ -40,6 +40,20 @@ class DummyPlugin(BaseWebPlugin):
         return None
 
 
+class UnsafeMetadataPlugin(DummyPlugin):
+    @property
+    def plugin_id(self) -> str:
+        return 'unsafe" onclick="alert(1)'
+
+    @property
+    def name(self) -> str:
+        return "<script>alert(2)</script>"
+
+    @property
+    def short_name(self) -> str:
+        return "<b>unsafe</b>"
+
+
 class WebPluginTests(unittest.TestCase):
     def test_plugin_manager_registration_and_aggregation(self):
         manager = WebPluginManager()
@@ -67,6 +81,15 @@ class WebPluginTests(unittest.TestCase):
         unhandled = manager.dispatch_api_get("/api/plugins/dummy_plugin/unknown", {})
         self.assertIsNone(unhandled)
 
+    def test_plugin_navigation_escapes_untrusted_metadata(self):
+        html = UnsafeMetadataPlugin().get_tab_button_html()
+
+        self.assertNotIn('<script>alert(2)</script>', html)
+        self.assertNotIn('id="tab_unsafe" onclick=', html)
+        self.assertIn("&lt;script&gt;alert(2)&lt;/script&gt;", html)
+        self.assertIn("&lt;b&gt;unsafe&lt;/b&gt;", html)
+        self.assertIn("&quot;", html)
+
     def test_mobile_camera_scanner_plugin(self):
         plugin = MobileCameraScannerPlugin()
         self.assertEqual(plugin.plugin_id, "mobile_camera_scanner")
@@ -91,6 +114,12 @@ class WebPluginTests(unittest.TestCase):
         self.assertIn("/assets/zxing-browser-0.2.1.min.js", js)
         self.assertIn("window.ZXingBrowser", js)
         self.assertIn("this.zxingCanvas.width", js)
+        self.assertIn("this.syncTogglePair('autoPrintOnScan'", js)
+        self.assertIn("this.syncTogglePair('hapticFeedback'", js)
+        self.assertIn("if (!this.hapticEnabled) return", js)
+        self.assertIn("const autoPrint = this.autoPrintEnabled", js)
+        self.assertIn("Math.floor(frameWidth * scale)", js)
+        self.assertNotIn("const cropX", js)
         self.assertIn("/api/scan?serial=${encodeURIComponent(this.currentSheetSerial)}&print=true", js)
         self.assertNotIn("fetch(`/api/print`", js)
         self.assertIn("data.entitlements[0].service", js)

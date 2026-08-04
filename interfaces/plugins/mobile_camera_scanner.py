@@ -501,6 +501,8 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                 this.zxingCanvas = null;
                 this.decoderName = null;
                 this.audioCtx = null;
+                this.autoPrintEnabled = false;
+                this.hapticEnabled = true;
                 this.decoderReady = this.initBarcodeDetector();
 
                 document.addEventListener('DOMContentLoaded', () => {
@@ -516,7 +518,25 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                             this.closeSettingsModal();
                         }
                     });
+                    this.syncTogglePair('autoPrintOnScan', 'autoPrintOnScanModal', 'autoPrintEnabled', false);
+                    this.syncTogglePair('hapticFeedback', 'hapticFeedbackModal', 'hapticEnabled', true);
                 });
+            }
+
+            syncTogglePair(primaryId, secondaryId, stateProperty, defaultValue) {
+                const primary = document.getElementById(primaryId);
+                const secondary = document.getElementById(secondaryId);
+                const initialValue = primary?.checked ?? secondary?.checked ?? defaultValue;
+                this[stateProperty] = initialValue;
+                if (primary) primary.checked = initialValue;
+                if (secondary) secondary.checked = initialValue;
+
+                const update = (source, target) => {
+                    this[stateProperty] = !!source.checked;
+                    if (target) target.checked = this[stateProperty];
+                };
+                primary?.addEventListener('change', () => update(primary, secondary));
+                secondary?.addEventListener('change', () => update(secondary, primary));
             }
 
             openSettingsModal() {
@@ -674,9 +694,7 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
             }
 
             playBeepSound() {
-                const desktopHaptic = document.getElementById('hapticFeedback')?.checked;
-                const modalHaptic = document.getElementById('hapticFeedbackModal')?.checked;
-                if (!(desktopHaptic || modalHaptic)) return;
+                if (!this.hapticEnabled) return;
                 try {
                     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
@@ -712,21 +730,17 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                                 if (!frameWidth || !frameHeight) {
                                     throw new Error('Camera frame is not ready');
                                 }
-                                const cropX = Math.floor(frameWidth * 0.15);
-                                const cropY = Math.floor(frameHeight * 0.20);
-                                const cropWidth = Math.floor(frameWidth * 0.70);
-                                const cropHeight = Math.floor(frameHeight * 0.60);
-                                const scale = Math.min(1, 1280 / cropWidth);
-                                this.zxingCanvas.width = Math.max(1, Math.floor(cropWidth * scale));
-                                this.zxingCanvas.height = Math.max(1, Math.floor(cropHeight * scale));
+                                const scale = Math.min(1, 1280 / frameWidth);
+                                this.zxingCanvas.width = Math.max(1, Math.floor(frameWidth * scale));
+                                this.zxingCanvas.height = Math.max(1, Math.floor(frameHeight * scale));
                                 const ctx = this.zxingCanvas.getContext('2d', { willReadFrequently: true });
                                 if (!ctx) throw new Error('Camera canvas is unavailable');
                                 ctx.drawImage(
                                     video,
-                                    cropX,
-                                    cropY,
-                                    cropWidth,
-                                    cropHeight,
+                                    0,
+                                    0,
+                                    frameWidth,
+                                    frameHeight,
                                     0,
                                     0,
                                     this.zxingCanvas.width,
@@ -788,7 +802,7 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
 
                 const reticle = document.getElementById('cameraReticle');
                 const overlay = document.getElementById('cameraOverlayText');
-                const autoPrint = (document.getElementById('autoPrintOnScan')?.checked || document.getElementById('autoPrintOnScanModal')?.checked) ?? false;
+                const autoPrint = this.autoPrintEnabled;
 
                 if (reticle) reticle.classList.add('scan-success');
                 if (overlay) overlay.textContent = `Barcode Detected: ${serial} — Fetching Warranty...`;

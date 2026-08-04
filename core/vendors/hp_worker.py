@@ -182,10 +182,24 @@ class HPBrowserWorker:
         from playwright.sync_api import sync_playwright
 
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
-            headless=self._headless,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
+        try:
+            self._browser = self._playwright.chromium.launch(
+                headless=self._headless,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+        except Exception:
+            try:
+                self._browser = self._playwright.chromium.launch(
+                    channel="msedge",
+                    headless=self._headless,
+                    args=["--disable-blink-features=AutomationControlled"],
+                )
+            except Exception:
+                self._browser = self._playwright.chromium.launch(
+                    channel="chrome",
+                    headless=self._headless,
+                    args=["--disable-blink-features=AutomationControlled"],
+                )
         self._context = self._browser.new_context(
             locale="en-US",
             user_agent=(

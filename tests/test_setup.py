@@ -167,7 +167,7 @@ class SetupTests(unittest.TestCase):
         self.assertIsNone(executed[2][1])
         self.assertEqual(
             executed[3][1],
-            {"NODE_EXTRA_CA_CERTS": "C:/certs/corporate.pem"},
+            {"NODE_EXTRA_CA_CERTS": str(Path("C:/certs/corporate.pem"))},
         )
         self.assertIsNone(executed[4][1])
 

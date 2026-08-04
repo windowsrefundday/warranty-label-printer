@@ -3,6 +3,7 @@ param(
     [string]$Command = "help",
     [int]$Port = 9191,
     [switch]$Tunnel,
+    [switch]$WithTunnelRuntime,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ExtraArgs
 )
@@ -17,6 +18,7 @@ Warranty Label Printer - Windows Operator Tool
 
 Usage:
   .\warranty-windows.ps1 setup
+  .\warranty-windows.ps1 setup -WithTunnelRuntime
   .\warranty-windows.ps1 doctor
   .\warranty-windows.ps1 printer
   .\warranty-windows.ps1 safe
@@ -57,7 +59,11 @@ switch ($Command) {
         Show-Help
     }
     "setup" {
-        & "$PSScriptRoot\setup-windows.ps1"
+        $setupArgs = @()
+        if ($WithTunnelRuntime) {
+            $setupArgs += "-WithTunnelRuntime"
+        }
+        & "$PSScriptRoot\setup-windows.ps1" @setupArgs
         exit $LASTEXITCODE
     }
     "doctor" {

@@ -9,7 +9,6 @@ on:
 permissions:
   actions: read
   contents: read
-  security-events: write
 
 jobs:
   detect_javascript:
@@ -20,6 +19,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Detect tracked JavaScript and TypeScript files
         id: detect
         shell: bash
@@ -35,9 +36,15 @@ jobs:
   analyze_python:
     name: Analyze Python
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:
@@ -51,9 +58,15 @@ jobs:
     needs: detect_javascript
     if: needs.detect_javascript.outputs.has_javascript == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     steps:
       - name: Check out source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         with:

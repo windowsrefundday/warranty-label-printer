@@ -42,6 +42,19 @@ ABSOLUTE_PATH_PATTERNS = (
 )
 WARRANTY_SERIAL_PATTERN = re.compile(r"\b(?:MXL|MZ)[0-9A-Z]{6,}\b", re.IGNORECASE)
 SYNTHETIC_MARKERS = ("TEST", "SYNTHETIC", "EXAMPLE", "FAKE")
+WORKFLOW_ACTION_PATTERN = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)", re.MULTILINE)
+FULL_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
+DOCKER_DIGEST_PATTERN = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-fA-F]{64}$")
+
+
+def _workflow_action_is_pinned(reference: str) -> bool:
+    """Return whether a workflow action reference is immutable."""
+    if reference.startswith("docker://"):
+        return bool(DOCKER_DIGEST_PATTERN.fullmatch(reference))
+    if "@" not in reference:
+        return False
+    _, revision = reference.rsplit("@", 1)
+    return bool(FULL_ACTION_SHA_PATTERN.fullmatch(revision))
 
 
 def audit(root: Path = ROOT) -> list[str]:
@@ -77,6 +90,14 @@ def audit(root: Path = ROOT) -> list[str]:
             failures.append(f"secret-like value: {relative}")
         if any(pattern.search(content) for pattern in ABSOLUTE_PATH_PATTERNS):
             failures.append(f"local absolute path: {relative}")
+        if (
+            relative.parts[:2] == (".github", "workflows")
+            and path.suffix.lower() in {".yml", ".yaml"}
+        ):
+            for reference in WORKFLOW_ACTION_PATTERN.findall(content):
+                if not _workflow_action_is_pinned(reference):
+                    failures.append(f"unpinned workflow action: {relative}")
+                    break
         non_synthetic = [
             value
             for value in WARRANTY_SERIAL_PATTERN.findall(content)

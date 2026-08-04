@@ -176,6 +176,58 @@ class HPBrowserWorkerTests(unittest.TestCase):
         self.assertIn("no browser", result.lookup_error or "")
         self.assertFalse(self.worker._running)
 
+    def test_lookup_started_during_startup_failure_resolves_without_hanging(self):
+        startup_entered = threading.Event()
+        release_startup = threading.Event()
+
+        def blocked_init_browser():
+            startup_entered.set()
+            self.assertTrue(release_startup.wait(timeout=2))
+            raise RuntimeError("no browser")
+
+        with patch.object(self.worker, "_init_browser", side_effect=blocked_init_browser):
+            start_errors: list[Exception] = []
+            starter = threading.Thread(
+                target=lambda: self._capture_exception(
+                    self.worker.start, start_errors
+                )
+            )
+            starter.start()
+            self.assertTrue(startup_entered.wait(timeout=2))
+
+            results: list[AssetRecord] = []
+            lookup = threading.Thread(
+                target=lambda: results.append(
+                    self.worker.fetch_warranty("MXLTEST002")
+                )
+            )
+            lookup.start()
+            deadline = time.monotonic() + 2
+            while "MXLTEST002" not in self.worker._in_flight:
+                if time.monotonic() >= deadline:
+                    self.fail("lookup was not registered before startup failed")
+                time.sleep(0.01)
+
+            release_startup.set()
+            lookup.join(timeout=2)
+            starter.join(timeout=2)
+
+        self.assertFalse(lookup.is_alive())
+        self.assertFalse(starter.is_alive())
+        self.assertEqual(len(start_errors), 1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(
+            results[0].source_confidence, SourceConfidence.UNVERIFIED_FAILED
+        )
+        self.assertIn("no browser", results[0].lookup_error or "")
+
+    @staticmethod
+    def _capture_exception(callback, errors: list[Exception]) -> None:
+        try:
+            callback()
+        except Exception as exc:
+            errors.append(exc)
+
     def test_fresh_cache_hit_returns_immediately_and_schedules_refresh(self):
         record = self._make_record("MXLTEST010", "January 1, 2100", date.today().isoformat())
         self.cache.set(record)

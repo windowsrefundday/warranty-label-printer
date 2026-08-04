@@ -64,12 +64,16 @@ class HPBrowserWorker:
     # ------------------------------------------------------------------
     def start(self) -> None:
         """Start the worker thread and initialize the browser."""
-        self._running = True
+        with self._lock:
+            self._running = True
+            self._startup_error = None
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         self._ready.wait()
-        if self._startup_error is not None:
-            raise self._startup_error
+        with self._lock:
+            startup_error = self._startup_error
+        if startup_error is not None:
+            raise startup_error
 
     def prewarm(self) -> None:
         """Block until the browser context is ready for the first lookup."""
@@ -77,7 +81,8 @@ class HPBrowserWorker:
 
     def stop(self) -> None:
         """Signal the worker to stop and close all browser resources."""
-        self._running = False
+        with self._lock:
+            self._running = False
         self._queue.put(None)
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=15)
@@ -121,10 +126,6 @@ class HPBrowserWorker:
             self._emit_direct(progress_callback, "Verified cache hit", 100)
             self._enqueue_refresh(serial)
             return self._from_cache(cached)
-        if self._startup_error is not None or not self._running:
-            error = str(self._startup_error or "HP browser worker is unavailable")
-            self._emit_direct(progress_callback, "Lookup failed", 100)
-            return self._lookup_failed(serial, error)
         return self._live_lookup(serial, progress_callback)
 
     def enqueue_refresh(self, serial: str) -> None:
@@ -133,13 +134,13 @@ class HPBrowserWorker:
         self._enqueue_refresh(serial)
 
     def _enqueue_refresh(self, serial: str) -> None:
-        if self._startup_error is not None or not self._running:
-            return
         with self._lock:
+            if self._startup_error is not None or not self._running:
+                return
             if serial in self._in_flight:
                 return
             self._in_flight.add(serial)
-        self._queue.put(serial)
+            self._queue.put(serial)
 
     def _live_lookup(
         self,
@@ -148,22 +149,35 @@ class HPBrowserWorker:
     ) -> AssetRecord:
         future: concurrent.futures.Future[AssetRecord] = concurrent.futures.Future()
         already_in_flight = False
+        unavailable_error: Optional[str] = None
         with self._lock:
-            if progress_callback is not None:
-                self._progress_callbacks.setdefault(serial, []).append(
-                    progress_callback
+            if self._startup_error is not None or not self._running:
+                unavailable_error = str(
+                    self._startup_error or "HP browser worker is unavailable"
                 )
-            if serial in self._in_flight:
-                self._pending.setdefault(serial, []).append(future)
-                already_in_flight = True
             else:
-                self._in_flight.add(serial)
-                self._pending[serial] = [future]
+                if progress_callback is not None:
+                    self._progress_callbacks.setdefault(serial, []).append(
+                        progress_callback
+                    )
+                if serial in self._in_flight:
+                    self._pending.setdefault(serial, []).append(future)
+                    already_in_flight = True
+                else:
+                    self._in_flight.add(serial)
+                    self._pending[serial] = [future]
+                    # Keep registration and enqueueing under the same lock as
+                    # the availability check. A concurrent startup failure or
+                    # stop can then either resolve this future or observe that
+                    # no work should be queued.
+                    self._queue.put(serial)
+        if unavailable_error is not None:
+            self._emit_direct(progress_callback, "Lookup failed", 100)
+            return self._lookup_failed(serial, unavailable_error)
         if already_in_flight:
             self._notify(serial, "Joining lookup already in progress", 15)
             return future.result()
         self._notify(serial, "Queued for HP portal", 10)
-        self._queue.put(serial)
         return future.result()
 
     # ------------------------------------------------------------------
@@ -173,14 +187,15 @@ class HPBrowserWorker:
         try:
             self._init_browser()
         except Exception as exc:
-            self._startup_error = exc
-            self._running = False
+            with self._lock:
+                self._startup_error = exc
+                self._running = False
             self._resolve_pending_failures(f"HP browser startup failed: {exc}")
             self._ready.set()
             return
         self._ready.set()
 
-        while self._running:
+        while self._is_running():
             try:
                 serial = self._queue.get(timeout=0.5)
             except queue.Empty:
@@ -188,6 +203,10 @@ class HPBrowserWorker:
             if serial is None:
                 break
             self._process(serial)
+
+    def _is_running(self) -> bool:
+        with self._lock:
+            return self._running
 
     def _resolve_pending_failures(self, error: str) -> None:
         with self._lock:

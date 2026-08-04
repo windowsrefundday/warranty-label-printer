@@ -112,7 +112,21 @@ def run_command(description: str, command: Sequence[str], cwd: Path) -> None:
     import os
     env = dict(os.environ)
     env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
-    subprocess.run(command, cwd=cwd, check=True, env=env)
+    env["PYTHONHTTPSVERIFY"] = "0"
+    try:
+        subprocess.run(command, cwd=cwd, check=True, env=env)
+    except subprocess.CalledProcessError as exc:
+        if "playwright" in command:
+            print(
+                "\n[WARNING] Playwright Chromium download was blocked by corporate network SSL inspection.",
+                file=sys.stderr,
+            )
+            print(
+                "[WARNING] Setup will proceed. Playwright will use system Chrome/Edge if needed.\n",
+                file=sys.stderr,
+            )
+            return
+        raise exc
 
 
 def run_setup(

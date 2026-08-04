@@ -6,10 +6,11 @@ import unittest
 from datetime import date, timedelta
 import typing
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from core.cache import WarrantyCache
 from core.models import AssetRecord, Entitlement, SourceConfidence, VendorType
+from core.vendors.browser_runtime import BrowserSession
 from core.vendors.hp_worker import HPBrowserWorker
 
 
@@ -418,6 +419,19 @@ class HPBrowserWorkerTests(unittest.TestCase):
         self.assertTrue(fake_context.closed)
         self.assertTrue(fake_browser.closed)
         playwright.stop.assert_called_once()
+
+    def test_init_browser_uses_shared_runtime_and_records_selection(self):
+        browser = FakeBrowser()
+        session = BrowserSession(MagicMock(), browser, "Microsoft Edge")
+
+        with patch("core.vendors.hp_worker.start_browser", return_value=session):
+            with patch.object(self.worker, "_preload_portal"):
+                self.worker._init_browser()
+
+        self.assertEqual(self.worker._browser_runtime, "Microsoft Edge")
+        self.assertIs(self.worker._browser, browser)
+        self.assertIsNotNone(self.worker._context)
+        self.worker._cleanup()
 
 
 if __name__ == "__main__":

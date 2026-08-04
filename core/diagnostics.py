@@ -13,6 +13,7 @@ from typing import Any, Optional
 from core.app_paths import get_app_paths
 from core.engine import WarrantyEngine
 from core.printers.tsc_connector import TSCPrinterConnector
+from core.vendors.browser_runtime import available_system_browsers
 
 
 def build_diagnostic_report(
@@ -79,10 +80,21 @@ def _browser_status() -> dict[str, Any]:
     except Exception as exc:
         chromium_installed = False
         error = str(exc)
+    system_browsers = available_system_browsers()
+    preferred_runtime = (
+        "bundled-chromium"
+        if chromium_installed
+        else system_browsers[0]
+        if system_browsers
+        else None
+    )
     return {
         "playwright_installed": True,
         "playwright_version": version,
         "chromium_installed": chromium_installed,
+        "system_browsers": list(system_browsers),
+        "fallback_available": bool(system_browsers),
+        "preferred_runtime": preferred_runtime,
         "error": error,
     }
 

@@ -1,5 +1,6 @@
 param(
-    [switch]$WithTunnelRuntime
+    [switch]$WithTunnelRuntime,
+    [string]$BrowserCaCert
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,6 +48,9 @@ Write-Step 2 "Running the shared read-only setup"
 $setupArgs = @()
 if ($WithTunnelRuntime) {
     $setupArgs += "--with-tunnel-runtime"
+}
+if ($BrowserCaCert) {
+    $setupArgs += @("--browser-ca-cert", $BrowserCaCert)
 }
 & $pythonExe @pythonPrefix "$PSScriptRoot\tools\setup.py" @setupArgs
 Assert-LastCommand "Shared setup"

@@ -8,6 +8,7 @@ from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from core.cache import WarrantyCache
 from core.models import AssetRecord, SourceConfidence, VendorType
+from core.vendors.browser_runtime import start_browser
 from core.vendors.lenovo_parser import (
     LenovoProductResolver,
     parse_lenovo_warranty,
@@ -54,6 +55,7 @@ class LenovoBrowserWorker:
 
         self._playwright = None
         self._browser = None
+        self._browser_runtime: Optional[str] = None
         self._context = None
         self._preloaded_page = None
         self._startup_error: Optional[Exception] = None
@@ -113,6 +115,7 @@ class LenovoBrowserWorker:
             except Exception:
                 pass
             self._playwright = None
+        self._browser_runtime = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -238,23 +241,27 @@ class LenovoBrowserWorker:
                     future.set_result(result)
 
     def _init_browser(self) -> None:
-        from playwright.sync_api import sync_playwright
-
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
+        session = start_browser(
             headless=self._headless,
             args=["--disable-blink-features=AutomationControlled"],
         )
-        self._context = self._browser.new_context(
-            locale="en-US",
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/126.0.0.0 Safari/537.36"
-            ),
-        )
-        if self._preload_enabled:
-            self._preload_portal()
+        self._playwright = session.playwright
+        self._browser = session.browser
+        self._browser_runtime = session.runtime
+        try:
+            self._context = self._browser.new_context(
+                locale="en-US",
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                ),
+            )
+            if self._preload_enabled:
+                self._preload_portal()
+        except Exception:
+            self._cleanup()
+            raise
 
     def _preload_portal(self) -> None:
         assert self._context is not None

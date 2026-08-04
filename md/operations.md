@@ -6,9 +6,13 @@
 - Windows: `.\warranty-windows.ps1 setup`, then
   `.\warranty-windows.ps1 doctor` when troubleshooting.
 
-Setup installs pinned Python dependencies, Chromium, and optional tunnel
-runtime support. It does not print, calibrate, select a default printer, or
-download a driver.
+Setup installs pinned Python dependencies, attempts Chromium, and supports
+optional tunnel runtime installation. A blocked Chromium download is reported
+as a warning so Windows can use installed Edge or Chrome; dependency and
+diagnostic failures remain fatal. A trusted corporate CA may be supplied only
+for that browser download stage with `-BrowserCaCert`. Setup does not disable
+TLS verification globally. It does not print, calibrate, select a default
+printer, or download a driver.
 
 ## Runtime modes
 

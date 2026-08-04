@@ -221,6 +221,34 @@ class HPBrowserWorkerTests(unittest.TestCase):
         )
         self.assertIn("no browser", results[0].lookup_error or "")
 
+    def test_restart_waits_for_new_browser_initialization(self):
+        self.worker._init_browser = lambda: None
+        self.worker.start()
+        self.worker.stop()
+
+        startup_entered = threading.Event()
+        release_startup = threading.Event()
+
+        def blocked_init_browser():
+            startup_entered.set()
+            self.assertTrue(release_startup.wait(timeout=2))
+
+        with patch.object(self.worker, "_init_browser", side_effect=blocked_init_browser):
+            start_errors: list[Exception] = []
+            starter = threading.Thread(
+                target=lambda: self._capture_exception(
+                    self.worker.start, start_errors
+                )
+            )
+            starter.start()
+            self.assertTrue(startup_entered.wait(timeout=2))
+            self.assertTrue(starter.is_alive())
+            release_startup.set()
+            starter.join(timeout=2)
+
+        self.assertFalse(starter.is_alive())
+        self.assertEqual(start_errors, [])
+
     @staticmethod
     def _capture_exception(callback, errors: list[Exception]) -> None:
         try:

@@ -67,6 +67,7 @@ class HPBrowserWorker:
         with self._lock:
             self._running = True
             self._startup_error = None
+        self._ready.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         self._ready.wait()

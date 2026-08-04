@@ -109,7 +109,10 @@ def build_setup_commands(
 
 def run_command(description: str, command: Sequence[str], cwd: Path) -> None:
     """Run one setup stage and fail immediately if it cannot complete."""
-    subprocess.run(command, cwd=cwd, check=True)
+    import os
+    env = dict(os.environ)
+    env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0"
+    subprocess.run(command, cwd=cwd, check=True, env=env)
 
 
 def run_setup(

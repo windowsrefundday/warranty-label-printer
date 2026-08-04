@@ -3,6 +3,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
 Set-Location -LiteralPath $PSScriptRoot
 
 function Write-Step {

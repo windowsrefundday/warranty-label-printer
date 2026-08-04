@@ -40,7 +40,11 @@ class WebPluginManager:
 
     def get_all_javascript(self) -> str:
         """Aggregate JavaScript scripts from all registered plugins."""
-        js_blocks = [f"/* Plugin: {p.name} */\n" + p.get_javascript() for p in self._plugins.values() if p.get_javascript()]
+        js_blocks = [
+            f"<!-- Plugin: {p.name} -->\n" + p.get_javascript()
+            for p in self._plugins.values()
+            if p.get_javascript()
+        ]
         return "\n".join(js_blocks)
 
     def dispatch_api_get(self, path: str, query_params: Dict[str, Any]) -> Optional[Tuple[int, Dict[str, Any]]]:

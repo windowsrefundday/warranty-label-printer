@@ -1,8 +1,8 @@
 """Layout selection and bounded rendering for TSPL labels."""
 
-from core.label_formatters import tspl_layout_calibration, tspl_layout_narrow, tspl_layout_standard, tspl_layout_warranty_3x1
+from core.label_formatters import tspl_layout_calibration, tspl_layout_ee, tspl_layout_narrow, tspl_layout_standard, tspl_layout_warranty_3x1
 from core.label_formatters.tspl_commands import RenderedPayload
-from core.models import AssetRecord
+from core.models import AssetRecord, EERecord
 from core.printers.profiles.models import LabelProfile
 
 
@@ -23,3 +23,10 @@ def render_calibration(profile: LabelProfile, test_serial: str = "TEST123") -> R
         raise RuntimeError("Label profile dimensions are not configured; run calibration and set measured width_mm, height_mm, and gap_mm.")
     profile.validate()
     return tspl_layout_calibration.render(profile, test_serial)
+
+
+def render_ee(record: EERecord, profile: LabelProfile) -> RenderedPayload:
+    if not profile.is_configured():
+        raise RuntimeError("Label profile dimensions are not configured; run calibration and set measured width_mm, height_mm, and gap_mm.")
+    profile.validate()
+    return tspl_layout_ee.render(record, profile)

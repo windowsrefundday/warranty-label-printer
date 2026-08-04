@@ -10,6 +10,11 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m playwright install chromium
+command -v npm >/dev/null || {
+    printf '%s\n' "Node.js/npm is required for the locked HTTPS tunnel runtime." >&2
+    exit 1
+}
+npm ci --omit=dev --ignore-scripts
 .venv/bin/python main.py --diagnose
 
 printf '%s\n' "Setup complete. Start the scanner with ./run-macos.sh"

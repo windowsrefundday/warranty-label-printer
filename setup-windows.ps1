@@ -49,6 +49,12 @@ Write-Step 3 "Installing pinned application dependencies"
 Assert-LastCommand "pip upgrade"
 & $venvPython -m pip install -r "$PSScriptRoot\requirements-windows.txt"
 Assert-LastCommand "Dependency installation"
+$npmCommand = Get-Command npm -ErrorAction SilentlyContinue
+if (-not $npmCommand) {
+    throw "Node.js/npm is required for the locked HTTPS tunnel runtime. Install Node.js LTS and rerun setup."
+}
+& $npmCommand.Source ci --omit=dev --ignore-scripts
+Assert-LastCommand "Locked tunnel dependency installation"
 
 Write-Step 4 "Installing the application-managed Chromium browser"
 & $venvPython -m playwright install chromium

@@ -31,7 +31,11 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
 
     @property
     def icon(self) -> str:
-        return "📱"
+        return '<svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>'
+
+    @property
+    def short_name(self) -> str:
+        return "Camera"
 
     def get_css(self) -> str:
         return """
@@ -39,47 +43,52 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 20px;
+            padding: 16px;
+            position: relative;
         }
         .mobile-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
-        .pairing-box {
-            background: rgba(56, 189, 248, 0.08);
-            border: 1px dashed var(--accent);
-            border-radius: 10px;
-            padding: 14px;
-            margin-bottom: 20px;
+        .mobile-header h2 {
+            font-family: var(--font-heading);
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.015em;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            flex-wrap: wrap;
+            gap: 8px;
         }
-        .qr-box {
-            background: #ffffff;
-            padding: 8px;
+        .gear-btn {
+            background: #27272a;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            width: 34px;
+            height: 34px;
             border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-width: 120px;
-            min-height: 120px;
+            cursor: pointer;
+            transition: none;
         }
+        .gear-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
         .viewfinder-container {
             position: relative;
             width: 100%;
             max-width: 640px;
-            margin: 0 auto 16px auto;
+            margin: 0 auto 14px auto;
             border-radius: 12px;
             overflow: hidden;
             background: #000;
             aspect-ratio: 4 / 3;
-            border: 2px solid var(--border);
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border: 1px solid var(--border);
         }
         #mobileCameraVideo {
             width: 100%;
@@ -93,14 +102,14 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
             left: 15%;
             width: 70%;
             height: 60%;
-            border: 1px dashed rgba(56, 189, 248, 0.5);
+            border: 2px solid var(--accent);
+            border-radius: 12px;
             pointer-events: none;
             box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
-            transition: border-color 0.2s;
         }
         .reticle-box.scan-success {
-            border: 3px solid var(--success) !important;
-            box-shadow: 0 0 0 9999px rgba(34, 197, 94, 0.2) !important;
+            border-color: var(--success) !important;
+            box-shadow: 0 0 0 9999px rgba(34, 197, 94, 0.15) !important;
         }
         .reticle-corner {
             position: absolute;
@@ -114,100 +123,265 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
         .reticle-corner.bottom-left { bottom: -2px; left: -2px; border-width: 0 0 3px 3px; }
         .reticle-corner.bottom-right { bottom: -2px; right: -2px; border-width: 0 3px 3px 0; }
 
-        .scan-laser {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: #ef4444;
-            box-shadow: 0 0 8px #ef4444;
-            animation: laserScan 2s infinite ease-in-out;
-        }
-        @keyframes laserScan {
-            0% { top: 0%; opacity: 0.8; }
-            50% { top: 98%; opacity: 1; }
-            100% { top: 0%; opacity: 0.8; }
-        }
-
         .overlay-msg {
             position: absolute;
-            bottom: 12px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            background: rgba(15, 23, 42, 0.85);
-            color: #fff;
-            font-size: 0.85rem;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            max-width: calc(100% - 64px);
+            z-index: 870;
+            background: rgba(9, 9, 11, 0.85);
+            color: var(--text-main);
+            font-family: var(--font-heading);
+            font-size: 0.825rem;
+            font-weight: 600;
             padding: 6px 12px;
-            backdrop-filter: blur(4px);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            pointer-events: none;
         }
 
         .camera-controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             justify-content: center;
             flex-wrap: wrap;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
-        .scanner-settings {
-            background: #090d16;
-            padding: 12px 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            margin-bottom: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+
+        /* Mobile App Shell: Full-Viewport Camera (<768px) */
+        @media (max-width: 768px) {
+            .mobile-scanner-card {
+                padding: 0;
+                border: none;
+                background: transparent;
+            }
+            .mobile-header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 860;
+                background: rgba(9, 9, 11, 0.65);
+                padding: 10px 16px;
+                margin: 0;
+                border: none;
+            }
+            .mobile-header h2 {
+                display: none;
+            }
+            .overlay-msg {
+                position: fixed;
+                top: 48px;
+                left: 12px;
+                right: 12px;
+                max-width: calc(100% - 24px);
+                z-index: 870;
+            }
+            .viewfinder-container {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 60px;
+                width: 100%;
+                height: auto;
+                max-width: 100%;
+                border-radius: 0;
+                border: none;
+                margin: 0;
+                aspect-ratio: unset;
+                z-index: 850;
+            }
+            .camera-controls {
+                position: fixed;
+                bottom: 68px;
+                left: 0;
+                right: 0;
+                z-index: 860;
+                background: rgba(9, 9, 11, 0.65);
+                padding: 10px 16px;
+                margin: 0;
+                justify-content: center;
+            }
         }
-        .setting-row {
+
+        /* Settings Gear Modal */
+        .settings-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1050;
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: center;
+            padding: 16px;
+            transition: none !important;
+            animation: none !important;
+        }
+        .settings-modal-overlay.hidden { display: none !important; }
+        .settings-modal-card {
+            background: #18181b;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        /* Google Lens / Pokédex Instant Bottom Card Popup */
+        .bottom-sheet {
+            position: fixed;
+            bottom: 68px;
+            left: 12px;
+            right: 12px;
+            max-width: 600px;
+            margin: 0 auto;
+            background: #18181b;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px 18px 18px;
+            z-index: 950;
+            box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.95);
+            transition: none !important;
+            animation: none !important;
+        }
+        .bottom-sheet.hidden { display: none !important; }
+        .sheet-handle {
+            width: 36px;
+            height: 4px;
+            background: #3f3f46;
+            border-radius: 2px;
+            margin: 0 auto 10px auto;
+        }
+        .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .sheet-close-btn {
+            background: #27272a;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 0.9rem;
-            color: var(--text-main);
             cursor: pointer;
         }
-        .result-card {
-            margin-top: 16px;
-            border-left: 4px solid var(--accent);
-            animation: fadeIn 0.25s ease-out;
+        .sheet-close-btn:hover { color: #fff; background: #3f3f46; }
+        .sheet-title {
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 2px;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
+        .sheet-subtitle {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
+        }
+        .sheet-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            background: #09090b;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-size: 0.8rem;
+        }
+        /* Desktop Settings Header (Top of page on >768px) */
+        .desktop-settings-header {
+            margin-bottom: 16px;
+        }
+        @media (min-width: 769px) {
+            .gear-btn {
+                display: none !important;
+            }
+            .settings-modal-overlay {
+                display: none !important;
+            }
+        }
+        @media (max-width: 768px) {
+            .desktop-settings-header {
+                display: none !important;
+            }
         }
         """
 
     def get_content_html(self, host: str, port: int, public_url: Optional[str] = None) -> str:
         local_ip = get_local_ip()
         pairing_url = public_url if public_url else f"http://{local_ip}:{port}"
-        qr_svg = PureQRCode(pairing_url).to_svg(120)
+        qr_svg = PureQRCode(pairing_url).to_svg(110)
 
         return f"""
         <div class="mobile-scanner-card">
             <div class="mobile-header">
-                <h2>📱 Phone Camera Barcode Scanner</h2>
-                <span id="cameraStatusBadge" class="badge badge-warning">Camera Standby</span>
+                <h2>
+                    <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    Google Lens Scanner
+                </h2>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="cameraStatusBadge" class="badge badge-warning">Standby</span>
+                    <button class="gear-btn" onclick="window.mobileScannerPlugin.openSettingsModal()" title="Settings & QR Pairing">
+                        <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </button>
+                </div>
             </div>
 
-            <!-- Desktop-to-Mobile Pairing Banner -->
-            <div id="desktopPairingBanner" class="pairing-box">
-                <div>
-                    <div style="font-weight:700; color:var(--accent); font-size:1.05rem;">📲 Open on Your Phone</div>
-                    <div style="font-size:0.88rem; color:var(--text-muted); margin-top:4px;">
-                        Scan QR code with your phone camera or open:
-                        <br>
-                        <code id="pairingUrlDisplay" style="color:#fff; font-weight:bold; font-size:1.05rem;">{pairing_url}</code>
+            <!-- Desktop Settings Header (Rendered on Desktop Top of Page) -->
+            <div class="desktop-settings-header">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <!-- Pairing Box -->
+                    <div style="background:#09090b; border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+                        <div>
+                            <div style="font-weight:700; color:var(--accent); font-size:0.95rem; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                                <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                Desktop QR Pairing Link
+                            </div>
+                            <code style="color:#fff; font-size:0.85rem; word-break:break-all;">{pairing_url}</code>
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Scan with phone camera to connect</div>
+                        </div>
+                        <div style="background:#fff; padding:6px; border-radius:8px; min-width:90px; text-align:center;">
+                            {qr_svg}
+                        </div>
+                    </div>
+
+                    <!-- Manual Input & Toggles -->
+                    <div style="background:#09090b; border:1px solid var(--border); border-radius:10px; padding:14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px;">
+                        <div>
+                            <label for="mobileManualSerial" style="font-weight:700; font-size:0.85rem; display:block; margin-bottom:6px;">Manual Serial Entry</label>
+                            <div style="display:flex; gap:8px;">
+                                <input id="mobileManualSerial" type="text" autocomplete="off" placeholder="Enter serial..." style="flex:1;">
+                                <button class="btn btn-secondary" onclick="window.mobileScannerPlugin.submitManualSerial();">
+                                    Lookup
+                                </button>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:16px; align-items:center;">
+                            <label class="setting-row" style="margin:0;">
+                                <input type="checkbox" id="autoPrintOnScan">
+                                <span><strong>Auto-Print on Scan</strong></span>
+                            </label>
+                            <label class="setting-row" style="margin:0;">
+                                <input type="checkbox" id="hapticFeedback" checked>
+                                <span><strong>Beep & Haptic Feedback</strong></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
-                <div id="qrCodeContainer" class="qr-box">
-                    {qr_svg}
-                </div>
             </div>
 
-
-            <!-- Camera Viewfinder -->
+            <!-- Full-Screen Hero Camera Viewfinder -->
             <div class="viewfinder-container">
                 <video id="mobileCameraVideo" playsinline autoplay muted></video>
                 <div id="cameraReticle" class="reticle-box">
@@ -215,79 +389,199 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                     <div class="reticle-corner top-right"></div>
                     <div class="reticle-corner bottom-left"></div>
                     <div class="reticle-corner bottom-right"></div>
-                    <div class="scan-laser"></div>
                 </div>
-                <div id="cameraOverlayText" class="overlay-msg">Click 'Start Camera' or open on phone</div>
+                <div id="cameraOverlayText" class="overlay-msg">Point camera at serial barcode</div>
             </div>
 
-            <!-- Controls -->
+            <!-- Camera Controls Overlay -->
             <div class="camera-controls">
                 <button id="btnToggleCamera" class="btn btn-primary" onclick="window.mobileScannerPlugin.toggleCamera()">
-                    📹 Start Camera
+                    <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                    Start Camera
                 </button>
                 <button id="btnFlipCamera" class="btn btn-secondary" onclick="window.mobileScannerPlugin.flipCamera()" disabled>
-                    🔄 Flip Camera
+                    <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6"/><path d="M2.5 22v-6h6"/><path d="M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8"/><path d="M22 12.5a10 10 0 0 1-18.8 4.2L2.5 16"/></svg>
+                    Flip
                 </button>
                 <button id="btnTorch" class="btn btn-outline" onclick="window.mobileScannerPlugin.toggleTorch()" disabled>
-                    ⚡ Flashlight
+                    <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Flashlight
                 </button>
             </div>
 
-            <!-- Settings -->
-            <div class="scanner-settings">
-                <label class="setting-row">
-                    <input type="checkbox" id="autoPrintOnScan" checked>
-                    <span>⚡ <strong>Auto-Print Label on Scan</strong> (Sends label immediately upon verified lookup)</span>
-                </label>
-                <label class="setting-row">
-                    <input type="checkbox" id="hapticFeedback" checked>
-                    <span>🔊 <strong>Audio & Haptic Feedback</strong> (Beep + vibration on successful barcode match)</span>
-                </label>
+            <!-- Top Settings Gear Modal Overlay (For Mobile Screen View) -->
+            <div id="settingsGearModal" class="settings-modal-overlay hidden">
+                <div class="settings-modal-card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                        <h3 style="margin:0; font-size:1.1rem; display:flex; align-items:center; gap:6px;">
+                            <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                            Scanner Settings &amp; QR Pairing
+                        </h3>
+                        <button class="sheet-close-btn" onclick="window.mobileScannerPlugin.closeSettingsModal()">✕</button>
+                    </div>
+
+                    <!-- Pairing Box -->
+                    <div style="background:#09090b; border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:14px;">
+                        <div style="font-weight:700; color:var(--accent); font-size:0.9rem; margin-bottom:4px;">Desktop QR Pairing Link</div>
+                        <code style="color:#fff; font-size:0.85rem;">{pairing_url}</code>
+                        <div style="margin-top:8px; display:flex; justify-content:center; background:#fff; padding:6px; border-radius:6px;">
+                            {qr_svg}
+                        </div>
+                    </div>
+
+                    <!-- Manual Input -->
+                    <div style="background:#09090b; border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:14px;">
+                        <label for="mobileManualSerialModal" style="font-weight:700; font-size:0.85rem; display:block; margin-bottom:6px;">Manual Serial Entry</label>
+                        <div style="display:flex; gap:8px;">
+                            <input id="mobileManualSerialModal" type="text" autocomplete="off" placeholder="Enter serial..." style="flex:1;">
+                            <button class="btn btn-secondary" onclick="window.mobileScannerPlugin.submitManualSerial(); window.mobileScannerPlugin.closeSettingsModal();">
+                                Lookup
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Toggles -->
+                    <div style="background:#09090b; border:1px solid var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;">
+                        <label class="setting-row">
+                            <input type="checkbox" id="autoPrintOnScanModal">
+                            <span><strong>Auto-Print on Scan</strong></span>
+                        </label>
+                        <label class="setting-row">
+                            <input type="checkbox" id="hapticFeedbackModal" checked>
+                            <span><strong>Beep & Haptic Feedback</strong></span>
+                        </label>
+                    </div>
+                </div>
             </div>
 
-            <!-- Result Overlay -->
-            <div id="mobileScanResultCard" class="card result-card hidden"></div>
+            <!-- Instant Pokédex / Google Lens Warranty Popup Card -->
+            <div id="warrantyBottomSheet" class="bottom-sheet hidden">
+                <div class="sheet-handle"></div>
+                <div class="sheet-header">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <span id="sheetVendorBadge" class="badge badge-warning">VENDOR</span>
+                        <span id="sheetStatusBadge" class="badge badge-success">VALID WARRANTY</span>
+                    </div>
+                    <button class="sheet-close-btn" onclick="window.mobileScannerPlugin.closeBottomSheet()">✕</button>
+                </div>
+                <div class="sheet-body">
+                    <div id="sheetSerialNumber" class="sheet-title">SN: LENOVO12345</div>
+                    <div id="sheetModelName" class="sheet-subtitle">ThinkPad Laptop</div>
+                    <div class="sheet-details-grid">
+                        <div><span style="color:var(--text-muted);">Expiration:</span> <br><strong id="sheetEndDate" style="color:#fff;">2027-12-31</strong></div>
+                        <div><span style="color:var(--text-muted);">Entitlement:</span> <br><strong id="sheetTier" style="color:#fff;">On-Site Support</strong></div>
+                    </div>
+                </div>
+                <div class="sheet-actions">
+                    <button id="btnSheetPrint" class="btn btn-primary btn-full" onclick="window.mobileScannerPlugin.printCurrentSheetLabel()">
+                        <svg class="icon-glyph" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v5"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+                        Print 1 Warranty Label
+                    </button>
+                </div>
+            </div>
         </div>
         """
 
     def get_javascript(self) -> str:
         return """
+        <script src="/assets/zxing-browser-0.2.1.min.js"></script>
         <script>
         class MobileCameraScannerPluginController {
             constructor() {
-                self = this;
                 this.stream = null;
                 this.facingMode = 'environment';
                 this.isScanning = false;
                 this.isProcessingScan = false;
                 this.lastScannedSerial = '';
                 this.lastScanTime = 0;
+                this.currentSheetSerial = '';
                 this.torchState = false;
                 this.barcodeDetector = null;
+                this.zxingReader = null;
+                this.zxingCanvas = null;
+                this.decoderName = null;
                 this.audioCtx = null;
+                this.autoPrintEnabled = false;
+                this.hapticEnabled = true;
+                this.decoderReady = this.initBarcodeDetector();
 
                 document.addEventListener('DOMContentLoaded', () => {
-                    this.initBarcodeDetector();
-
-                    // Auto-open camera if launched directly on mobile screen
-                    if (window.innerWidth < 768) {
-                        const tabBtn = document.getElementById('tab_mobile_camera_scanner');
-                        if (tabBtn) tabBtn.click();
-                    }
+                    document.getElementById('mobileManualSerial')?.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') {
+                            this.submitManualSerial();
+                            this.closeSettingsModal();
+                        }
+                    });
+                    document.getElementById('mobileManualSerialModal')?.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') {
+                            this.submitManualSerial();
+                            this.closeSettingsModal();
+                        }
+                    });
+                    this.syncTogglePair('autoPrintOnScan', 'autoPrintOnScanModal', 'autoPrintEnabled', false);
+                    this.syncTogglePair('hapticFeedback', 'hapticFeedbackModal', 'hapticEnabled', true);
                 });
             }
 
+            syncTogglePair(primaryId, secondaryId, stateProperty, defaultValue) {
+                const primary = document.getElementById(primaryId);
+                const secondary = document.getElementById(secondaryId);
+                const initialValue = primary?.checked ?? secondary?.checked ?? defaultValue;
+                this[stateProperty] = initialValue;
+                if (primary) primary.checked = initialValue;
+                if (secondary) secondary.checked = initialValue;
+
+                const update = (source, target) => {
+                    this[stateProperty] = !!source.checked;
+                    if (target) target.checked = this[stateProperty];
+                };
+                primary?.addEventListener('change', () => update(primary, secondary));
+                secondary?.addEventListener('change', () => update(secondary, primary));
+            }
+
+            openSettingsModal() {
+                const modal = document.getElementById('settingsGearModal');
+                if (modal) modal.classList.remove('hidden');
+            }
+
+            closeSettingsModal() {
+                const modal = document.getElementById('settingsGearModal');
+                if (modal) modal.classList.add('hidden');
+            }
 
             async initBarcodeDetector() {
                 if ('BarcodeDetector' in window) {
                     try {
                         const formats = await BarcodeDetector.getSupportedFormats();
                         this.barcodeDetector = new BarcodeDetector({ formats: formats.length > 0 ? formats : ['code_128', 'code_39', 'qr_code', 'ean_13', 'upc_a'] });
-                        console.log('Native BarcodeDetector initialized with formats:', formats);
+                        this.decoderName = 'Native BarcodeDetector';
+                        return true;
                     } catch(e) {
-                        console.warn('BarcodeDetector format error:', e);
+                        console.warn('Native barcode detector initialization failed:', e);
                     }
                 }
+
+                try {
+                    if (window.ZXingBrowser?.BrowserMultiFormatReader) {
+                        this.zxingReader = new window.ZXingBrowser.BrowserMultiFormatReader();
+                        this.zxingCanvas = document.createElement('canvas');
+                        this.decoderName = 'ZXing';
+                        return true;
+                    }
+                } catch(e) {
+                    console.error('ZXing initialization failed:', e);
+                }
+
+                const badge = document.getElementById('cameraStatusBadge');
+                const overlay = document.getElementById('cameraOverlayText');
+                if (badge) {
+                    badge.textContent = 'Decoder Error';
+                    badge.className = 'badge badge-danger';
+                }
+                if (overlay) {
+                    overlay.textContent = 'Barcode decoder failed to load. Reload this page.';
+                }
+                return false;
             }
 
             async toggleCamera() {
@@ -306,7 +600,10 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                 const flipBtn = document.getElementById('btnFlipCamera');
 
                 try {
-                    overlay.textContent = 'Requesting camera access...';
+                    const decoderAvailable = await this.decoderReady;
+                    if (!decoderAvailable) {
+                        throw new Error('Barcode decoder is unavailable. Reload the page and try again.');
+                    }
                     const constraints = {
                         video: {
                             facingMode: { ideal: this.facingMode },
@@ -320,14 +617,17 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                     await video.play();
 
                     this.isScanning = true;
-                    toggleBtn.textContent = '🛑 Stop Camera';
-                    toggleBtn.className = 'btn btn-secondary';
-                    flipBtn.disabled = false;
-                    badge.textContent = 'Camera Active';
-                    badge.className = 'badge badge-success';
-                    overlay.textContent = 'Point camera at serial barcode...';
+                    if (toggleBtn) {
+                        toggleBtn.textContent = 'Stop Camera';
+                        toggleBtn.className = 'btn btn-secondary';
+                    }
+                    if (flipBtn) flipBtn.disabled = false;
+                    if (badge) {
+                        badge.textContent = 'Active';
+                        badge.className = 'badge badge-success';
+                    }
+                    if (overlay) overlay.textContent = 'Point camera at serial barcode...';
 
-                    // Check torch support
                     const track = this.stream.getVideoTracks()[0];
                     const capabilities = track.getCapabilities ? track.getCapabilities() : {};
                     const torchBtn = document.getElementById('btnTorch');
@@ -336,9 +636,11 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                     this.runScanLoop();
                 } catch(err) {
                     console.error('Camera access error:', err);
-                    overlay.textContent = 'Camera access error: ' + (err.message || 'Permission denied');
-                    badge.textContent = 'Camera Error';
-                    badge.className = 'badge badge-danger';
+                    if (overlay) overlay.textContent = 'Camera error: ' + (err.message || 'Permission denied');
+                    if (badge) {
+                        badge.textContent = 'Error';
+                        badge.className = 'badge badge-danger';
+                    }
                 }
             }
 
@@ -358,16 +660,16 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                 const torchBtn = document.getElementById('btnTorch');
 
                 if (toggleBtn) {
-                    toggleBtn.textContent = '📹 Start Camera';
+                    toggleBtn.textContent = 'Start Camera';
                     toggleBtn.className = 'btn btn-primary';
                 }
                 if (flipBtn) flipBtn.disabled = true;
                 if (torchBtn) torchBtn.disabled = true;
                 if (badge) {
-                    badge.textContent = 'Camera Standby';
+                    badge.textContent = 'Standby';
                     badge.className = 'badge badge-warning';
                 }
-                if (overlay) overlay.textContent = 'Click \'Start Camera\' to resume scanning';
+                if (overlay) overlay.textContent = "Click 'Start Camera' to resume scanning";
             }
 
             async flipCamera() {
@@ -388,13 +690,11 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                     if (torchBtn) {
                         torchBtn.className = this.torchState ? 'btn btn-primary' : 'btn btn-outline';
                     }
-                } catch(e) {
-                    console.warn('Torch toggle failed:', e);
-                }
+                } catch(e) {}
             }
 
             playBeepSound() {
-                if (!document.getElementById('hapticFeedback')?.checked) return;
+                if (!this.hapticEnabled) return;
                 try {
                     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
@@ -404,7 +704,7 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                     const osc = this.audioCtx.createOscillator();
                     const gain = this.audioCtx.createGain();
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(880, this.audioCtx.currentTime); // High pitch A5 chime
+                    osc.frequency.setValueAtTime(880, this.audioCtx.currentTime);
                     gain.gain.setValueAtTime(0.15, this.audioCtx.currentTime);
                     gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.18);
                     osc.connect(gain);
@@ -416,7 +716,6 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
 
             async runScanLoop() {
                 const video = document.getElementById('mobileCameraVideo');
-                const overlay = document.getElementById('cameraOverlayText');
 
                 while (this.isScanning) {
                     if (video && video.readyState === video.HAVE_ENOUGH_DATA && !this.isProcessingScan) {
@@ -424,99 +723,130 @@ class MobileCameraScannerPlugin(BaseWebPlugin):
                             let detectedRawValue = null;
                             if (this.barcodeDetector) {
                                 const barcodes = await this.barcodeDetector.detect(video);
-                                if (barcodes && barcodes.length > 0) {
-                                    detectedRawValue = barcodes[0].rawValue;
+                                if (barcodes && barcodes.length > 0) detectedRawValue = barcodes[0].rawValue;
+                            } else if (this.zxingReader && this.zxingCanvas) {
+                                const frameWidth = video.videoWidth;
+                                const frameHeight = video.videoHeight;
+                                if (!frameWidth || !frameHeight) {
+                                    throw new Error('Camera frame is not ready');
                                 }
+                                const scale = Math.min(1, 1280 / frameWidth);
+                                this.zxingCanvas.width = Math.max(1, Math.floor(frameWidth * scale));
+                                this.zxingCanvas.height = Math.max(1, Math.floor(frameHeight * scale));
+                                const ctx = this.zxingCanvas.getContext('2d', { willReadFrequently: true });
+                                if (!ctx) throw new Error('Camera canvas is unavailable');
+                                ctx.drawImage(
+                                    video,
+                                    0,
+                                    0,
+                                    frameWidth,
+                                    frameHeight,
+                                    0,
+                                    0,
+                                    this.zxingCanvas.width,
+                                    this.zxingCanvas.height
+                                );
+                                const result = await this.zxingReader.decodeFromCanvas(this.zxingCanvas);
+                                detectedRawValue = result.getText();
                             }
 
                             if (detectedRawValue) {
                                 const serial = detectedRawValue.trim().toUpperCase();
                                 const now = Date.now();
-                                // 3 second cooldown for identical barcode
                                 if (serial !== this.lastScannedSerial || (now - this.lastScanTime) > 3000) {
                                     this.lastScannedSerial = serial;
                                     this.lastScanTime = now;
                                     await this.handleBarcodeDetected(serial);
                                 }
                             }
-                        } catch(err) {
-                            // frame skip or detection cycle error
-                        }
+                        } catch(err) {}
                     }
-                    await new Promise(r => setTimeout(r, 120));
+                    await new Promise(r => setTimeout(r, this.zxingReader ? 220 : 120));
+                }
+            }
+
+            submitManualSerial() {
+                const deskInput = document.getElementById('mobileManualSerial');
+                const modalInput = document.getElementById('mobileManualSerialModal');
+                const val = (deskInput && deskInput.value) ? deskInput.value : (modalInput ? modalInput.value : '');
+                const serial = val.trim();
+                if (!serial || this.isProcessingScan) return;
+                if (deskInput) deskInput.value = '';
+                if (modalInput) modalInput.value = '';
+                this.handleBarcodeDetected(serial.toUpperCase());
+            }
+
+            closeBottomSheet() {
+                const sheet = document.getElementById('warrantyBottomSheet');
+                if (sheet) sheet.classList.add('hidden');
+            }
+
+            async printCurrentSheetLabel() {
+                if (!this.currentSheetSerial) return;
+                const btn = document.getElementById('btnSheetPrint');
+                if (btn) btn.textContent = 'Sending to printer...';
+                try {
+                    const res = await fetch(`/api/scan?serial=${encodeURIComponent(this.currentSheetSerial)}&print=true`);
+                    const data = await res.json();
+                    const printOk = !!(data.print_result && data.print_result.success);
+                    if (btn) btn.textContent = printOk ? 'Label Sent Successfully!' : 'Print Error';
+                } catch(e) {
+                    if (btn) btn.textContent = 'Print Failed';
                 }
             }
 
             async handleBarcodeDetected(serial) {
                 this.isProcessingScan = true;
+                this.currentSheetSerial = serial;
                 this.playBeepSound();
 
                 const reticle = document.getElementById('cameraReticle');
                 const overlay = document.getElementById('cameraOverlayText');
-                const resultCard = document.getElementById('mobileScanResultCard');
-                const autoPrint = document.getElementById('autoPrintOnScan')?.checked ?? true;
+                const autoPrint = this.autoPrintEnabled;
 
                 if (reticle) reticle.classList.add('scan-success');
                 if (overlay) overlay.textContent = `Barcode Detected: ${serial} — Fetching Warranty...`;
-
-                if (resultCard) {
-                    resultCard.classList.remove('hidden');
-                    resultCard.innerHTML = `
-                        <div style="color:var(--accent); font-size:1.1rem; font-weight:700;">🔍 Scanning Serial: ${serial}</div>
-                        <div class="progress-shell"><div class="progress-bar" style="width: 50%;"></div></div>
-                        <div style="font-size:0.85rem; color:var(--text-muted);">Verifying live vendor warranty portal...</div>
-                    `;
-                }
 
                 try {
                     const res = await fetch(`/api/scan?serial=${encodeURIComponent(serial)}&print=${autoPrint}`);
                     const data = await res.json();
 
-                    const statusClass = ['Active', 'Expired', 'Coverage'].includes(String(data.status).split(' ')[0]) ? String(data.status).split(' ')[0] : 'Expired';
-                    let printMsg = 'Label: Auto-print off';
-                    if (autoPrint && data.print_result) {
-                        printMsg = data.print_result.success
-                            ? `🖨️ Sent to ${data.print_result.printer || 'Printer'}`
-                            : `⚠️ Print Error: ${data.print_result.error || 'Failed'}`;
-                    }
+                    // Pokédex / Google Lens Instant Card Overlay
+                    const sheet = document.getElementById('warrantyBottomSheet');
+                    const sheetVendor = document.getElementById('sheetVendorBadge');
+                    const sheetStatus = document.getElementById('sheetStatusBadge');
+                    const sheetSerial = document.getElementById('sheetSerialNumber');
+                    const sheetModel = document.getElementById('sheetModelName');
+                    const sheetEnd = document.getElementById('sheetEndDate');
+                    const sheetTier = document.getElementById('sheetTier');
+                    const printBtn = document.getElementById('btnSheetPrint');
 
-                    if (resultCard) {
-                        resultCard.innerHTML = `
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <h3 style="margin:0;">${escapeHtml(data.vendor)} - ${escapeHtml(data.model)}</h3>
-                                <span class="badge ${statusClass === 'Active' ? 'badge-success' : 'badge-danger'}">${escapeHtml(data.status)}</span>
-                            </div>
-                            <p style="margin:6px 0 0 0; font-size:1.1rem; font-weight:bold; font-family:monospace; color:var(--accent);">
-                                Serial: ${escapeHtml(data.serial)}
-                            </p>
-                            <p style="margin:4px 0; font-size:0.9rem; color:var(--text-muted);">
-                                Coverage Expiration: <strong>${escapeHtml(data.expiration_date)}</strong> (Source: ${escapeHtml(data.source_confidence)})
-                            </p>
-                            <div style="font-size:0.85rem; font-weight:bold; color:${data.print_result?.success ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">
-                                ${printMsg} (${data.lookup_ms} ms)
-                            </div>
-                        `;
+                    if (sheetVendor) sheetVendor.textContent = data.vendor || 'UNKNOWN';
+                    if (sheetStatus) {
+                        sheetStatus.textContent = data.status || 'UNVERIFIED';
+                        const statusText = String(data.status).toLowerCase();
+                        const isOk = statusText.includes('active') || statusText.includes('valid') || statusText.includes('ready');
+                        sheetStatus.className = `badge ${isOk ? 'badge-success' : 'badge-danger'}`;
                     }
+                    if (sheetSerial) sheetSerial.textContent = `SN: ${data.serial || serial}`;
+                    if (sheetModel) sheetModel.textContent = `${data.vendor || ''} ${data.model || ''}`;
+                    if (sheetEnd) sheetEnd.textContent = data.expiration_date || 'N/A';
+                    const primaryEntitlement = Array.isArray(data.entitlements) && data.entitlements.length > 0
+                        ? data.entitlements[0].service
+                        : null;
+                    if (sheetTier) sheetTier.textContent = primaryEntitlement || 'Standard Coverage';
+                    if (printBtn) printBtn.textContent = 'Print 1 Warranty Label';
 
-                    if (overlay) overlay.textContent = `Verified ${serial} (${data.status}) — Ready for next scan`;
+                    if (sheet) sheet.classList.remove('hidden');
+                    if (overlay) overlay.textContent = `Scanned ${serial} (${data.status})`;
                 } catch(err) {
-                    if (resultCard) {
-                        resultCard.innerHTML = `<div style="color:var(--danger);">Lookup request failed for serial ${serial}</div>`;
-                    }
-                    if (overlay) overlay.textContent = `Error processing serial ${serial}`;
+                    if (overlay) overlay.textContent = `Error looking up serial ${serial}`;
                 } finally {
                     setTimeout(() => {
                         if (reticle) reticle.classList.remove('scan-success');
                         this.isProcessingScan = false;
-                    }, 1200);
+                    }, 800);
                 }
-            }
-
-            handleApiGet(path, queryParams) {
-                if (path === '/api/plugins/mobile_camera_scanner/info') {
-                    return { local_ip: get_local_ip() };
-                }
-                return None;
             }
         }
         window.mobileScannerPlugin = new MobileCameraScannerPluginController();

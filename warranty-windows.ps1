@@ -2,6 +2,7 @@ param(
     [ValidateSet("help", "setup", "doctor", "printer", "safe", "cli", "web", "verify")]
     [string]$Command = "help",
     [int]$Port = 9191,
+    [switch]$Tunnel,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$ExtraArgs
 )
@@ -21,6 +22,7 @@ Usage:
   .\warranty-windows.ps1 safe
   .\warranty-windows.ps1 cli
   .\warranty-windows.ps1 web -Port 9191
+  .\warranty-windows.ps1 web -Port 9191 -Tunnel
   .\warranty-windows.ps1 verify
 
 Commands:
@@ -29,7 +31,7 @@ Commands:
   printer  Select and save one validated local USB TSC MB341 queue
   safe     Start the scanner with virtual-file output only
   cli      Start normal scanner mode; physical output requires a valid binding
-  web      Start the browser interface on this PC and local network
+  web      Start the browser interface; add -Tunnel for secure phone camera use
   verify   Run unit tests, compilation, and Pyright when Node.js is available
 "@
 }
@@ -115,7 +117,12 @@ switch ($Command) {
     }
     "web" {
         Require-Environment
-        & $python main.py --mode web --port $Port @ExtraArgs
+        $webArgs = @("main.py", "--mode", "web", "--port", $Port)
+        if ($Tunnel) {
+            $webArgs += "--tunnel"
+        }
+        $webArgs += $ExtraArgs
+        & $python @webArgs
         exit $LASTEXITCODE
     }
     "verify" {

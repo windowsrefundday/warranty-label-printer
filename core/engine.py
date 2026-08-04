@@ -5,7 +5,7 @@ import io
 from datetime import date, datetime
 from typing import Callable, Dict, List, Mapping, Optional
 from core.cache import WarrantyCache
-from core.models import AssetRecord, VendorType, PrintJobResult, SourceConfidence
+from core.models import AssetRecord, EERecord, VendorType, PrintJobResult, SourceConfidence
 from core.scanner import BarcodeScannerParser
 from core.vendors.base import BaseVendorPlugin
 from core.vendors.dell import DellVendorPlugin
@@ -59,6 +59,14 @@ class WarrantyEngine:
 
         # Session Scan Audit History
         self.scan_history: List[AssetRecord] = []
+
+    @staticmethod
+    def parse_ee_scan(raw_barcode: str) -> Optional[EERecord]:
+        """Recognize an internal EE scan without invoking a warranty vendor."""
+        ee_number = BarcodeScannerParser.parse_ee_number(raw_barcode)
+        if ee_number is None:
+            return None
+        return EERecord(ee_number=ee_number, raw_code=raw_barcode)
 
     def start(self) -> None:
         """Start/prewarm plugin-owned resources without OEM special cases."""
@@ -140,6 +148,16 @@ class WarrantyEngine:
                     ),
                 )
         return connector.print_label(asset, printer_name=printer_name)
+
+    def print_ee_label(
+        self,
+        record: EERecord,
+        printer_name: Optional[str] = None,
+    ) -> PrintJobResult:
+        """Dispatch a recognized internal EE number through the active connector."""
+        return self.get_active_connector().print_ee_label(
+            record, printer_name=printer_name
+        )
 
     @staticmethod
     def _cache_age_days(asset: AssetRecord) -> Optional[int]:

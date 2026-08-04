@@ -6,7 +6,7 @@ from typing import Any, List, Optional, cast
 
 from core.app_paths import get_app_paths
 from core.label_formatters.tspl import TSPLLabelFormatter
-from core.models import AssetRecord, PrintJobResult
+from core.models import AssetRecord, EERecord, PrintJobResult
 from core.printers.base import BasePrinterConnector
 from core.printers.bindings import PrinterBinding, load_binding
 from core.printers.contracts import PrinterDiscovery, RawTransport
@@ -235,6 +235,32 @@ class TSCPrinterConnector(BasePrinterConnector):
         return self._submit_payload(
             TSPLLabelFormatter.format_tspl_label(asset, self.profile), queue, timeout=15
         )
+
+    def print_ee_label(
+        self,
+        record: EERecord,
+        printer_name: Optional[str] = None,
+    ) -> PrintJobResult:
+        """Submit one raw, large-number EE label through the platform transport."""
+        if not self.profile.is_configured():
+            return PrintJobResult(
+                success=False,
+                printer_name=printer_name or self.binding.queue_name,
+                error_message=(
+                    "TSC MB341 stock profile is not configured; "
+                    "run calibration to set measured width, height, and gap."
+                ),
+            )
+        try:
+            queue = self._validate_queue_for_print(printer_name)
+            payload = TSPLLabelFormatter.format_ee_label(record, self.profile)
+        except Exception as exc:
+            return PrintJobResult(
+                success=False,
+                printer_name=printer_name or self.binding.queue_name,
+                error_message=str(exc),
+            )
+        return self._submit_payload(payload, queue, timeout=15)
 
     def print_calibration_label(
         self, printer_name: Optional[str] = None, test_serial: str = "TEST123"

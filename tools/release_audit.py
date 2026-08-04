@@ -96,7 +96,7 @@ def audit(root: Path = ROOT) -> list[str]:
         ):
             for reference in WORKFLOW_ACTION_PATTERN.findall(content):
                 if not _workflow_action_is_pinned(reference):
-                    failures.append(f"unpinned workflow action: {relative}")
+                    failures.append(f"unpinned workflow action: {relative.as_posix()}")
                     break
         non_synthetic = [
             value

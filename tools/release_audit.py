@@ -63,18 +63,24 @@ def _workflow_action_references(content: str) -> list[str]:
     """Return every action reference from a parsed workflow document."""
     document: Any = yaml.safe_load(content)
     references: list[str] = []
+    seen: set[int] = set()
+    pending: list[Any] = [document]
 
-    def visit(value: Any) -> None:
+    while pending:
+        value = pending.pop()
+        if isinstance(value, (dict, list)):
+            identity = id(value)
+            if identity in seen:
+                continue
+            seen.add(identity)
         if isinstance(value, dict):
             for key, child in value.items():
                 if key == "uses" and isinstance(child, str):
                     references.append(child)
-                visit(child)
+                pending.append(child)
         elif isinstance(value, list):
-            for child in value:
-                visit(child)
+            pending.extend(value)
 
-    visit(document)
     return references
 
 

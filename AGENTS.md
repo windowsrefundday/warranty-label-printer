@@ -63,4 +63,5 @@ Never commit credentials, local bindings, caches, `.env`, or `.venv`. Preserve e
 - Tests and CI bots: [`md/tests.md`](md/tests.md), [`md/bots.md`](md/bots.md)
 - Operations and release safety: [`md/operations.md`](md/operations.md),
   [`md/tools-and-release.md`](md/tools-and-release.md)
+- Operational security practices: [`md/security.md`](md/security.md)
 - Security reporting: [`SECURITY.md`](SECURITY.md)

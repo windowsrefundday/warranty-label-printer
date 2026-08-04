@@ -30,7 +30,6 @@ jobs:
 
   zizmor:
     name: Zizmor
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,4 +45,4 @@ jobs:
         uses: zizmorcore/zizmor-action@5f14fd08f7cf1cb1609c1e344975f152c7ee938d # v0.5.6
         with:
           version: "v1.29.0"
-          advanced-security: true
+          advanced-security: ${{ github.event_name != 'pull_request' }}

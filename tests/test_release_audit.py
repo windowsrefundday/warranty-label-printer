@@ -101,6 +101,27 @@ jobs:
 
         self.assertEqual(failures, ["unpinned workflow action: .github/workflows/test.yml"])
 
+    def test_rejects_unpinned_workflow_action_with_quoted_key(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workflow = root / ".github" / "workflows" / "test.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                """name: Test
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - "uses": actions/checkout@v4
+""",
+                encoding="utf-8",
+            )
+
+            failures = audit(root)
+
+        self.assertEqual(failures, ["unpinned workflow action: .github/workflows/test.yml"])
+
     def test_accepts_sha_pinned_actions_and_digest_pinned_docker_images(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

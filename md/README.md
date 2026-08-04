@@ -21,6 +21,8 @@ together, and how changes move through testing and release checks.
 - [`interfaces.md`](interfaces.md) — CLI, web dashboard, scanner, and plugins.
 - [`operations.md`](operations.md) — setup, diagnostics, runtime modes, and
   runtime data.
+- [`security.md`](security.md) — operational security practices and data
+  handling.
 - [`tests.md`](tests.md) — test organization and validation commands.
 - [`bots.md`](bots.md) — GitHub Actions, dependency automation, and required
   checks.

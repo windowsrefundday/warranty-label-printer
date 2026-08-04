@@ -6,6 +6,9 @@ import hashlib
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+import yaml  # pyright: ignore[reportMissingModuleSource, reportMissingTypeStubs]
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,7 +45,6 @@ ABSOLUTE_PATH_PATTERNS = (
 )
 WARRANTY_SERIAL_PATTERN = re.compile(r"\b(?:MXL|MZ)[0-9A-Z]{6,}\b", re.IGNORECASE)
 SYNTHETIC_MARKERS = ("TEST", "SYNTHETIC", "EXAMPLE", "FAKE")
-WORKFLOW_ACTION_PATTERN = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)", re.MULTILINE)
 FULL_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
 DOCKER_DIGEST_PATTERN = re.compile(r"^docker://[^@\s]+@sha256:[0-9a-fA-F]{64}$")
 
@@ -55,6 +57,25 @@ def _workflow_action_is_pinned(reference: str) -> bool:
         return False
     _, revision = reference.rsplit("@", 1)
     return bool(FULL_ACTION_SHA_PATTERN.fullmatch(revision))
+
+
+def _workflow_action_references(content: str) -> list[str]:
+    """Return every action reference from a parsed workflow document."""
+    document: Any = yaml.safe_load(content)
+    references: list[str] = []
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key == "uses" and isinstance(child, str):
+                    references.append(child)
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(document)
+    return references
 
 
 def audit(root: Path = ROOT) -> list[str]:
@@ -94,7 +115,12 @@ def audit(root: Path = ROOT) -> list[str]:
             relative.parts[:2] == (".github", "workflows")
             and path.suffix.lower() in {".yml", ".yaml"}
         ):
-            for reference in WORKFLOW_ACTION_PATTERN.findall(content):
+            try:
+                references = _workflow_action_references(content)
+            except yaml.YAMLError:
+                failures.append(f"invalid workflow YAML: {relative.as_posix()}")
+                continue
+            for reference in references:
                 if not _workflow_action_is_pinned(reference):
                     failures.append(f"unpinned workflow action: {relative.as_posix()}")
                     break

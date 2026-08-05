@@ -183,7 +183,14 @@ class UpdaterTests(unittest.TestCase):
             runtime.external_attr = (0o100755) << 16
             bundle.writestr(runtime, "python")
         destination = updater.extract_archive(archive, self.root / "mode-out")
-        self.assertTrue(os.stat(destination / "runtime/bin/python").st_mode & 0o111)
+        with zipfile.ZipFile(archive) as bundle:
+            stored_mode = (bundle.getinfo("runtime/bin/python").external_attr >> 16) & 0o777
+        self.assertEqual(stored_mode, 0o755)
+        if os.name == "nt":
+            # Windows does not expose POSIX execute bits through st_mode.
+            self.assertTrue((destination / "runtime/bin/python").is_file())
+        else:
+            self.assertTrue(os.stat(destination / "runtime/bin/python").st_mode & 0o111)
 
     def test_prepare_activate_health_and_rollback(self):
         package = self._archive()

@@ -63,6 +63,31 @@ check is at least six hours old and repeats checks every six hours while the app
 is running. Set
 `WARRANTY_LABEL_UPDATE_MANIFEST_URL` only when using a private release mirror.
 
+> **Temporary Windows update workaround — remove after the staging rename bug
+> is fixed.** If `update-download` reports `Access is denied` while moving
+> `release.tmp` to `release`, use a fresh update directory:
+>
+> ```powershell
+> $env:WARRANTY_LABEL_UPDATE_ROOT = Join-Path $env:LOCALAPPDATA "WarrantyLabelPrinter\updates-v2"
+> New-Item -ItemType Directory -Force `
+>   "$env:WARRANTY_LABEL_UPDATE_ROOT\staging" | Out-Null
+> .\warranty-windows.ps1 update-download
+> .\.venv\Scripts\python.exe .\tools\launcher.py run -- --mode cli --printer tsc
+> ```
+>
+> If that succeeds, keep the location for future PowerShell sessions:
+>
+> ```powershell
+> [Environment]::SetEnvironmentVariable(
+>   "WARRANTY_LABEL_UPDATE_ROOT",
+>   $env:WARRANTY_LABEL_UPDATE_ROOT,
+>   "User"
+> )
+> ```
+>
+> If the error persists, reboot Windows and retry once. Do not delete the
+> `versions` directory.
+
 ### Updating a legacy source installation
 
 The first managed release does not overwrite a legacy checkout or its local
@@ -114,6 +139,9 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\setup-windows.ps1
 .\warranty-windows.ps1 web -Port 9191
 ```
+
+Run `.\warranty-windows.ps1` with no command to open the interactive menu
+for CLI, web, safe mode, diagnostics, updates, status, rollback, and setup.
 
 On macOS, open Terminal in the repository folder and run:
 

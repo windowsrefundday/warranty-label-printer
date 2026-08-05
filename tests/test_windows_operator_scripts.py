@@ -30,11 +30,22 @@ class WindowsOperatorScriptTests(unittest.TestCase):
 
         self.assertIn("--printer file", script)
         self.assertIn("--printer tsc", script)
-        self.assertIn("tools\\launcher.py\" run --diagnose", script)
-        self.assertIn("tools\\launcher.py\" run --setup-printer", script)
+        self.assertIn("tools\\launcher.py\" run -- --diagnose", script)
+        self.assertIn("tools\\launcher.py\" run -- --setup-printer", script)
         self.assertIn('"update-download"', script)
         self.assertIn("if ($ExtraArgs)", script)
         self.assertIn("ValidateSet", script)
+
+    def test_operator_helper_has_interactive_menu_and_preserves_explicit_commands(self) -> None:
+        script = (ROOT / "warranty-windows.ps1").read_text(encoding="utf-8")
+
+        self.assertIn('[string]$Command = "menu"', script)
+        self.assertIn("function Invoke-Menu", script)
+        self.assertIn("1. Start CLI printer mode", script)
+        self.assertIn("5. Download and stage update", script)
+        self.assertIn("7. Roll back managed release", script)
+        self.assertIn('& $PSCommandPath cli', script)
+        self.assertIn('"menu" {', script)
 
     def test_readme_leads_with_windows_and_documents_operator_helper(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

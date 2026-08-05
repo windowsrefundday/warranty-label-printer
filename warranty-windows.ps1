@@ -1,6 +1,6 @@
 param(
-    [ValidateSet("help", "setup", "doctor", "printer", "safe", "cli", "web", "verify", "update", "update-download", "update-status", "rollback")]
-    [string]$Command = "help",
+    [ValidateSet("menu", "help", "setup", "doctor", "printer", "safe", "cli", "web", "verify", "update", "update-download", "update-status", "rollback")]
+    [string]$Command = "menu",
     [int]$Port = 9191,
     [switch]$Tunnel,
     [switch]$WithTunnelRuntime,
@@ -19,6 +19,7 @@ function Show-Help {
 Warranty Label Printer - Windows Operator Tool
 
 Usage:
+  .\warranty-windows.ps1              Interactive menu
   .\warranty-windows.ps1 setup
   .\warranty-windows.ps1 setup -WithTunnelRuntime
   .\warranty-windows.ps1 doctor
@@ -60,7 +61,49 @@ function Assert-ExitCode {
     }
 }
 
+function Invoke-Menu {
+    while ($true) {
+        Write-Host ""
+        Write-Host "Warranty Label Printer" -ForegroundColor Cyan
+        Write-Host "  1. Start CLI printer mode"
+        Write-Host "  2. Start web mode"
+        Write-Host "  3. Start safe virtual-output mode"
+        Write-Host "  4. Check for updates"
+        Write-Host "  5. Download and stage update"
+        Write-Host "  6. Show update status"
+        Write-Host "  7. Roll back managed release"
+        Write-Host "  8. Run diagnostics"
+        Write-Host "  9. Run setup"
+        Write-Host "  0. Exit"
+        $choice = Read-Host "Select an option"
+        switch ($choice) {
+            "1" { & $PSCommandPath cli; return }
+            "2" { & $PSCommandPath web; return }
+            "3" { & $PSCommandPath safe; return }
+            "4" { & $PSCommandPath update; Read-Host "Press Enter to continue" | Out-Null }
+            "5" { & $PSCommandPath update-download; Read-Host "Press Enter to continue" | Out-Null }
+            "6" { & $PSCommandPath update-status; Read-Host "Press Enter to continue" | Out-Null }
+            "7" {
+                $confirmation = Read-Host "Type ROLLBACK to confirm"
+                if ($confirmation -ceq "ROLLBACK") {
+                    & $PSCommandPath rollback
+                } else {
+                    Write-Host "Rollback cancelled." -ForegroundColor Yellow
+                }
+                Read-Host "Press Enter to continue" | Out-Null
+            }
+            "8" { & $PSCommandPath doctor; Read-Host "Press Enter to continue" | Out-Null }
+            "9" { & $PSCommandPath setup; Read-Host "Press Enter to continue" | Out-Null }
+            "0" { return }
+            default { Write-Host "Choose a number from 0 to 9." -ForegroundColor Yellow }
+        }
+    }
+}
+
 switch ($Command) {
+    "menu" {
+        Invoke-Menu
+    }
     "help" {
         Show-Help
     }
@@ -74,7 +117,7 @@ switch ($Command) {
     }
     "doctor" {
         Require-Environment
-        $diagnosticText = (& $python "$PSScriptRoot\tools\launcher.py" run --diagnose | Out-String)
+        $diagnosticText = (& $python "$PSScriptRoot\tools\launcher.py" run -- --diagnose | Out-String)
         Assert-ExitCode "Diagnostics"
         $diagnostic = $diagnosticText | ConvertFrom-Json
 
@@ -114,22 +157,22 @@ switch ($Command) {
     }
     "printer" {
         Require-Environment
-        & $python "$PSScriptRoot\tools\launcher.py" run --setup-printer
+        & $python "$PSScriptRoot\tools\launcher.py" run -- --setup-printer
         exit $LASTEXITCODE
     }
     "safe" {
         Require-Environment
-        & $python "$PSScriptRoot\tools\launcher.py" run --mode cli --printer file @ExtraArgs
+        & $python "$PSScriptRoot\tools\launcher.py" run -- --mode cli --printer file @ExtraArgs
         exit $LASTEXITCODE
     }
     "cli" {
         Require-Environment
-        & $python "$PSScriptRoot\tools\launcher.py" run --mode cli --printer tsc @ExtraArgs
+        & $python "$PSScriptRoot\tools\launcher.py" run -- --mode cli --printer tsc @ExtraArgs
         exit $LASTEXITCODE
     }
     "web" {
         Require-Environment
-        $webArgs = @("run", "--mode", "web", "--port", $Port)
+        $webArgs = @("run", "--", "--mode", "web", "--port", $Port)
         if ($Tunnel) {
             $webArgs += "--tunnel"
         }

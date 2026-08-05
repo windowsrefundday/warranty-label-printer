@@ -45,12 +45,15 @@ def _reserve_background_check(paths: updater.UpdatePaths) -> bool:
         state = updater.UpdateState.load(paths)
         if state.last_check:
             try:
-                elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(
-                    state.last_check.replace("Z", "+00:00")
-                )
-                if elapsed.total_seconds() < UPDATE_CHECK_INTERVAL_SECONDS:
+                if not isinstance(state.last_check, str):
+                    raise ValueError("last_check is not text")
+                elapsed_seconds = (
+                    datetime.now(timezone.utc)
+                    - datetime.fromisoformat(state.last_check.replace("Z", "+00:00"))
+                ).total_seconds()
+                if 0 <= elapsed_seconds < UPDATE_CHECK_INTERVAL_SECONDS:
                     return False
-            except ValueError:
+            except (AttributeError, TypeError, ValueError):
                 pass
         state.last_check = datetime.now(timezone.utc).isoformat()
         state.save(paths)
@@ -70,7 +73,7 @@ def _record_error(paths: updater.UpdatePaths, message: str) -> None:
             state = updater.UpdateState.load(paths)
             state.last_error = message[:500]
             state.save(paths)
-    except updater.UpdateError:
+    except (OSError, updater.UpdateError):
         return
 
 
@@ -190,8 +193,8 @@ def _load_signed_manifest() -> updater.Manifest:
 def check() -> int:
     """Check the signed update channel and return 0 on success, else 1."""
     paths = _managed_root()
-    paths.ensure()
     try:
+        paths.ensure()
         state = _mark_checked(paths)
         manifest = _load_signed_manifest()
         eligible = updater.choose_update(
@@ -209,16 +212,21 @@ def check() -> int:
         _record_error(paths, str(exc))
         print(f"Update check failed safely: {exc}", file=sys.stderr)
         return 1
+    except OSError as exc:
+        print(f"Update check failed safely: {exc}", file=sys.stderr)
+        return 1
 
 
 def download() -> int:
     """Download and stage an eligible update; return 0 on success, else 1."""
     paths = _managed_root()
-    paths.ensure()
     try:
+        paths.ensure()
         state = _mark_checked(paths)
         manifest = _load_signed_manifest()
-        if not updater.choose_update(manifest, state, updater.platform_target()):
+        eligible = updater.choose_update(manifest, state, updater.platform_target())
+        _clear_error(paths)
+        if not eligible:
             print("No eligible application update is available.")
             return 0
         updater.prepare_and_install(paths, manifest, updater.platform_target())
@@ -227,6 +235,9 @@ def download() -> int:
         return 0
     except updater.UpdateError as exc:
         _record_error(paths, str(exc))
+        print(f"Update failed safely: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
         print(f"Update failed safely: {exc}", file=sys.stderr)
         return 1
 

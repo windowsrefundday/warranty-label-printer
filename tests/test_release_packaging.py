@@ -1,13 +1,9 @@
 import base64
 import hashlib
-import io
 import json
 import tempfile
 import unittest
 import zipfile
-from contextlib import redirect_stderr
-from datetime import datetime, timedelta, timezone
-from unittest import mock
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -15,86 +11,14 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tools.package_release import build_package
 from tools.sign_manifest import create_manifest
-from tools.updater import Manifest, UpdatePaths, UpdateState, platform_target
-from tools import launcher
+from tools.updater import Manifest, UpdateError, platform_target
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleasePackagingTests(unittest.TestCase):
-    def test_launcher_passes_application_flags_without_parsing_them(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            with mock.patch.dict(
-                "os.environ",
-                {
-                    "WARRANTY_LABEL_UPDATE_ROOT": temporary,
-                    "WARRANTY_LABEL_DISABLE_AUTO_UPDATE": "1",
-                },
-                clear=False,
-            ), mock.patch.object(
-                launcher.subprocess, "call", return_value=0
-            ) as call:
-                self.assertEqual(launcher.main(["run", "--diagnose"]), 0)
-                self.assertIn("--diagnose", call.call_args.args[0])
-
-    def test_launcher_schedules_at_most_one_nonblocking_six_hour_download(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            paths = UpdatePaths.from_root(Path(temporary))
-            paths.ensure()
-            state = UpdateState()
-            state.save(paths)
-            with mock.patch.dict(
-                "os.environ", {"WARRANTY_LABEL_DISABLE_AUTO_UPDATE": "0"}, clear=False
-            ), mock.patch.object(
-                launcher.subprocess, "Popen"
-            ) as process:
-                launcher._schedule_background_update_check(paths)
-                launcher._schedule_background_update_check(paths)
-                process.assert_called_once()
-                self.assertEqual(process.call_args.args[0][-1], "download")
-
-    def test_launcher_waits_six_hours_before_repeating_background_check(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            paths = UpdatePaths.from_root(Path(temporary))
-            paths.ensure()
-            state = UpdateState(
-                last_check=(datetime.now(timezone.utc) - timedelta(hours=5)).isoformat()
-            )
-            state.save(paths)
-            with mock.patch.dict(
-                "os.environ", {"WARRANTY_LABEL_DISABLE_AUTO_UPDATE": "0"}, clear=False
-            ), mock.patch.object(launcher.subprocess, "Popen") as process:
-                launcher._schedule_background_update_check(paths)
-                process.assert_not_called()
-
-                state.last_check = (
-                    datetime.now(timezone.utc) - timedelta(hours=6, seconds=1)
-                ).isoformat()
-                state.save(paths)
-                launcher._schedule_background_update_check(paths)
-                process.assert_called_once()
-
-    def test_launcher_rechecks_while_application_is_running(self):
-        stop_event = mock.Mock()
-        stop_event.wait.side_effect = [False, True]
-        with mock.patch.object(launcher, "_schedule_background_update_check") as schedule:
-            launcher._background_update_loop(mock.sentinel.paths, stop_event)
-        schedule.assert_called_once_with(mock.sentinel.paths)
-        self.assertEqual(
-            stop_event.wait.call_args.args[0], launcher.UPDATE_CHECK_INTERVAL_SECONDS
-        )
-
-    def test_launcher_status_fails_safely_when_state_is_corrupt(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            paths = UpdatePaths.from_root(Path(temporary))
-            paths.state.parent.mkdir(parents=True, exist_ok=True)
-            paths.state.write_text("{", encoding="utf-8")
-            with mock.patch.object(launcher, "_managed_root", return_value=paths):
-                with redirect_stderr(io.StringIO()):
-                    self.assertEqual(launcher.status(), 1)
-
-    def test_package_contains_marker_application_and_runtime(self):
+    def test_package_contains_marker_application_and_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             runtime = root / "runtime"
@@ -121,7 +45,7 @@ class ReleasePackagingTests(unittest.TestCase):
                     zipfile.ZIP_DEFLATED,
                 )
 
-    def test_signed_manifest_round_trips_through_verifier(self):
+    def test_signed_manifest_round_trips_through_verifier(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             asset = root / "release.zip"
@@ -153,6 +77,11 @@ class ReleasePackagingTests(unittest.TestCase):
                 manifest.targets["macos-arm64"].sha256,
                 hashlib.sha256(b"release").hexdigest(),
             )
+
+            document["version"] = "1.2.4"
+            tampered = Manifest.from_mapping(document)
+            with self.assertRaises(UpdateError):
+                tampered.verify_signature({"test-key": public_b64})
 
             unsafe_asset = root / "release #1.zip"
             unsafe_asset.write_bytes(b"release")

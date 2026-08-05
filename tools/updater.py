@@ -280,14 +280,26 @@ class UpdateState:
             raise ValueError
         if document.get("schema_version") != 1:
             raise ValueError
+
+        def optional_text(name: str) -> str | None:
+            value = document.get(name)
+            if value is not None and not isinstance(value, str):
+                raise ValueError
+            return value
+
+        raw_failed_versions = document.get("failed_versions", [])
+        if not isinstance(raw_failed_versions, list) or not all(
+            isinstance(value, str) for value in raw_failed_versions
+        ):
+            raise ValueError
         state = cls(
-            install_id=str(document.get("install_id") or uuid.uuid4().hex),
-            current_version=document.get("current_version"),
-            previous_version=document.get("previous_version"),
-            pending_version=document.get("pending_version"),
-            last_check=document.get("last_check"),
-            last_error=document.get("last_error"),
-            failed_versions=[str(v) for v in document.get("failed_versions", [])],
+            install_id=optional_text("install_id") or uuid.uuid4().hex,
+            current_version=optional_text("current_version"),
+            previous_version=optional_text("previous_version"),
+            pending_version=optional_text("pending_version"),
+            last_check=optional_text("last_check"),
+            last_error=optional_text("last_error"),
+            failed_versions=raw_failed_versions,
         )
         for version in (state.current_version, state.previous_version, state.pending_version):
             if version is not None:

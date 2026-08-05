@@ -252,6 +252,21 @@ class UpdaterTests(unittest.TestCase):
         with self.assertRaises(updater.UpdateError):
             updater.UpdateState.load(self.paths)
 
+    def test_state_field_types_fail_closed(self):
+        self.paths.ensure()
+        invalid_documents = (
+            {"install_id": 123},
+            {"current_version": 123},
+            {"last_check": 123},
+            {"last_error": 123},
+            {"failed_versions": ["1.0.0", 123]},
+        )
+        for fields in invalid_documents:
+            document = {"schema_version": 1, **fields}
+            self.paths.state.write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaises(updater.UpdateError):
+                updater.UpdateState.load(self.paths)
+
     def test_state_backup_recovers_from_torn_primary(self):
         self.paths.ensure()
         original = updater.UpdateState(current_version="1.0.0")

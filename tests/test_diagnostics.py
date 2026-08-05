@@ -11,6 +11,7 @@ class BrowserDiagnosticsTests(unittest.TestCase):
     def test_source_reports_development_version(self) -> None:
         with patch.dict("os.environ", {}, clear=False):
             os.environ.pop("WARRANTY_LABEL_APP_VERSION", None)
+            os.environ.pop("WARRANTY_LABEL_MANAGED_ROOT", None)
             self.assertEqual(diagnostics.application_version(), "0.0.0-dev")
 
     def test_managed_root_marker_is_used_when_explicit(self) -> None:

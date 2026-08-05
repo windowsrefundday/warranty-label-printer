@@ -145,7 +145,7 @@ def run(arguments: Sequence[str]) -> int:
         return 1
 
 
-def _load_signed_manifest(paths: updater.UpdatePaths) -> updater.Manifest:
+def _load_signed_manifest() -> updater.Manifest:
     url = os.environ.get("WARRANTY_LABEL_UPDATE_MANIFEST_URL", updater.DEFAULT_MANIFEST_URL)
     manifest = updater.Manifest.from_mapping(updater.fetch_manifest(url))
     manifest.verify_signature()
@@ -154,11 +154,12 @@ def _load_signed_manifest(paths: updater.UpdatePaths) -> updater.Manifest:
 
 
 def check() -> int:
+    """Check the signed update channel and return 0 on success, else 1."""
     paths = _managed_root()
     paths.ensure()
-    state = _mark_checked(paths)
     try:
-        manifest = _load_signed_manifest(paths)
+        state = _mark_checked(paths)
+        manifest = _load_signed_manifest()
         eligible = updater.choose_update(
             manifest,
             state,
@@ -177,11 +178,12 @@ def check() -> int:
 
 
 def download() -> int:
+    """Download and stage an eligible update; return 0 on success, else 1."""
     paths = _managed_root()
     paths.ensure()
-    state = _mark_checked(paths)
     try:
-        manifest = _load_signed_manifest(paths)
+        state = _mark_checked(paths)
+        manifest = _load_signed_manifest()
         if not updater.choose_update(manifest, state, updater.platform_target()):
             print("No eligible application update is available.")
             return 0
@@ -196,6 +198,7 @@ def download() -> int:
 
 
 def status() -> int:
+    """Print persisted update state; return 0 on success, else 1."""
     paths = _managed_root()
     try:
         state = updater.UpdateState.load(paths)
@@ -207,6 +210,7 @@ def status() -> int:
 
 
 def rollback() -> int:
+    """Roll back to the previous release; return 0 on success, else 1."""
     paths = _managed_root()
     try:
         state = updater.rollback(paths, "operator requested rollback")

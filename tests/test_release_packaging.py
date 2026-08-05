@@ -122,6 +122,18 @@ class ReleasePackagingTests(unittest.TestCase):
                 hashlib.sha256(b"release").hexdigest(),
             )
 
+            unsafe_asset = root / "release #1.zip"
+            unsafe_asset.write_bytes(b"release")
+            with self.assertRaises(RuntimeError):
+                create_manifest(
+                    "1.2.3",
+                    "stable",
+                    "test-key",
+                    private_b64,
+                    {"macos-arm64": unsafe_asset},
+                    "https://updates.example.test/v1",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

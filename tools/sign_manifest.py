@@ -8,12 +8,15 @@ import hashlib
 import json
 import os
 import sys
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -22,7 +25,10 @@ if str(ROOT) not in sys.path:
 from tools.updater import _canonical_json, _safe_url, _version
 
 
-def _private_key(value: str) -> Ed25519PrivateKey:
+def _private_key(value: str) -> "Ed25519PrivateKey":
+    """Decode a raw base64url Ed25519 private key."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
     try:
         raw = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
         return Ed25519PrivateKey.from_private_bytes(raw)
@@ -47,9 +53,13 @@ def create_manifest(
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     targets: dict[str, object] = {}
     for target, path in assets.items():
+        asset_name = path.name
+        if urllib.parse.quote(asset_name, safe="._-") != asset_name:
+            raise RuntimeError("Asset filenames must contain only URL-safe characters")
         payload = path.read_bytes()
+        asset_url = _safe_url(f"{base_url.rstrip('/')}/{asset_name}")
         targets[target] = {
-            "url": f"{base_url.rstrip('/')}/{path.name}",
+            "url": asset_url,
             "sha256": hashlib.sha256(payload).hexdigest(),
             "size": len(payload),
         }
@@ -110,8 +120,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not separator or not target or not filename:
             parser.error(f"Invalid --asset: {specification}")
         path = Path(filename)
-        if target in assets or not path.is_file():
-            parser.error(f"Missing or duplicate asset: {specification}")
+        if target in assets:
+            parser.error(f"Duplicate asset target: {target}")
+        if not path.is_file():
+            parser.error(f"Asset file does not exist: {filename}")
         assets[target] = path
     try:
         verify_private_key_matches_pinned_key(args.key_id, secret)

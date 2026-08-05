@@ -362,14 +362,16 @@ class FileLock:
         self._handle = self.path.open("a+", encoding="ascii")
         try:
             if os.name == "nt":
-                msvcrt = __import__("msvcrt")
+                import msvcrt
+
                 self._handle.seek(0)
                 self._handle.write("0")
                 self._handle.flush()
                 self._handle.seek(0)
                 msvcrt.locking(self._handle.fileno(), msvcrt.LK_NBLCK, 1)
             else:
-                fcntl = __import__("fcntl")
+                import fcntl
+
                 fcntl.flock(self._handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             self._handle.seek(0)
             self._handle.truncate()
@@ -383,17 +385,22 @@ class FileLock:
 
     def __exit__(self, *_: object) -> None:
         if self._handle is not None:
-            if os.name == "nt":
-                msvcrt = __import__("msvcrt")
-                self._handle.seek(0)
-                try:
-                    msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
-                except OSError:
-                    pass
-            else:
-                fcntl = __import__("fcntl")
-                fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
-            self._handle.close()
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    self._handle.seek(0)
+                    try:
+                        msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
+                else:
+                    import fcntl
+
+                    fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+                self._handle.close()
+            finally:
+                self._handle = None
 
 
 def platform_target(system: str | None = None, machine: str | None = None) -> str:

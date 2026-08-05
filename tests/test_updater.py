@@ -102,6 +102,11 @@ class UpdaterTests(unittest.TestCase):
         with self.assertRaises(updater.UpdateError):
             updater.Manifest.from_mapping(document)
 
+        _, document = self._manifest()
+        document["targets"]["macos-arm64"]["size"] = updater.MAX_PACKAGE_BYTES + 1
+        with self.assertRaises(updater.UpdateError):
+            updater.Manifest.from_mapping(document)
+
     def test_redirect_downgrade_is_rejected(self):
         with self.assertRaises(updater.UpdateError):
             updater.fetch_manifest(
@@ -118,11 +123,6 @@ class UpdaterTests(unittest.TestCase):
                 "https://updates.example.test/manifest.json",
                 opener=lambda *_args, **_kwargs: RedirectResponse(b"{}"),
             )
-
-        _, document = self._manifest()
-        document["targets"]["macos-arm64"]["size"] = updater.MAX_PACKAGE_BYTES + 1
-        with self.assertRaises(updater.UpdateError):
-            updater.Manifest.from_mapping(document)
 
     def test_download_checks_hash_and_size(self):
         package = b"verified package"

@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 import zipfile
@@ -44,6 +45,34 @@ class ReleasePackagingTests(unittest.TestCase):
                     bundle.getinfo("runtime/python").compress_type,
                     zipfile.ZIP_DEFLATED,
                 )
+
+    def test_browser_symlinks_are_dereferenced_inside_browser_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            (runtime / "python").write_text("runtime", encoding="utf-8")
+            browsers = root / "browsers"
+            real_browser = browsers / "real"
+            real_browser.mkdir(parents=True)
+            (real_browser / "marker").write_text("browser", encoding="utf-8")
+            try:
+                (browsers / "linked").symlink_to(real_browser, target_is_directory=True)
+            except (OSError, NotImplementedError) as exc:
+                if os.name == "nt":
+                    self.skipTest(f"symlinks unavailable: {exc}")
+                raise
+            output = root / "release.zip"
+            build_package(
+                ROOT,
+                "1.2.3",
+                platform_target(),
+                output,
+                runtime=runtime,
+                browsers=browsers,
+            )
+            with zipfile.ZipFile(output) as bundle:
+                self.assertEqual(bundle.read("browsers/linked/marker"), b"browser")
 
     def test_signed_manifest_round_trips_through_verifier(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

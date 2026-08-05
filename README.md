@@ -63,6 +63,27 @@ check is at least six hours old and repeats checks every six hours while the app
 is running. Set
 `WARRANTY_LABEL_UPDATE_MANIFEST_URL` only when using a private release mirror.
 
+### Updating a legacy source installation
+
+The first managed release does not overwrite a legacy checkout or its local
+configuration. Stop the application, back up the checkout and its data, then
+bootstrap the signed updater from a fresh `v0.1.0` source checkout:
+
+```powershell
+git clone --branch v0.1.0 https://github.com/WindowsRefundDay/warranty-label-printer.git warranty-label-printer-v0.1.0
+cd warranty-label-printer-v0.1.0
+.\warranty-windows.ps1 setup
+.\warranty-windows.ps1 update
+.\warranty-windows.ps1 update-download
+```
+
+Restart with `.\warranty-windows.ps1 cli` (or `safe`). The download is staged
+and becomes active on the next launch; the old source checkout remains a
+fallback. On macOS, use the same fresh checkout and run
+`.venv/bin/python tools/launcher.py check` followed by `download`, then launch
+with `.venv/bin/python tools/launcher.py run ...`. Keep the existing application
+data directory in place so the updater can retain its state and rollback data.
+
 ## License and vulnerability reports
 
 This independently owned project is released under the [Apache License 2.0](LICENSE).

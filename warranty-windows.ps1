@@ -63,6 +63,7 @@ function Assert-ExitCode {
 }
 
 function Invoke-Menu {
+    $emptyCount = 0
     while ($true) {
         Write-Host ""
         Write-Host "Warranty Label Printer" -ForegroundColor Cyan
@@ -77,15 +78,27 @@ function Invoke-Menu {
         Write-Host "  9. Run diagnostics"
         Write-Host " 10. Run setup"
         Write-Host "  0. Exit"
-        $choice = Read-Host "Select an option"
+        $rawChoice = Read-Host "Select an option"
+        if ($null -eq $rawChoice) {
+            return
+        }
+        $choice = $rawChoice.Trim()
+        if ($choice -eq "") {
+            $emptyCount++
+            if ($emptyCount -ge 3) {
+                return
+            }
+            continue
+        }
+        $emptyCount = 0
         switch ($choice) {
             "1" { & $PSCommandPath cli; return }
             "2" { & $PSCommandPath web; return }
             "3" { & $PSCommandPath safe; return }
-            "4" { & $PSCommandPath update; $null = Read-Host "Press Enter to continue..." }
-            "5" { & $PSCommandPath update-download; $null = Read-Host "Press Enter to continue..." }
-            "6" { & $PSCommandPath update-status; $null = Read-Host "Press Enter to continue..." }
-            "7" { & $PSCommandPath update-reset; $null = Read-Host "Press Enter to continue..." }
+            "4" { & $PSCommandPath update; $null = Read-Host "Press Enter to continue..."; return }
+            "5" { & $PSCommandPath update-download; $null = Read-Host "Press Enter to continue..."; return }
+            "6" { & $PSCommandPath update-status; $null = Read-Host "Press Enter to continue..."; return }
+            "7" { & $PSCommandPath update-reset; $null = Read-Host "Press Enter to continue..."; return }
             "8" {
                 $confirmation = Read-Host "Type ROLLBACK to confirm"
                 if ($confirmation -ceq "ROLLBACK") {
@@ -94,9 +107,10 @@ function Invoke-Menu {
                     Write-Host "Rollback cancelled." -ForegroundColor Yellow
                 }
                 $null = Read-Host "Press Enter to continue..."
+                return
             }
-            "9" { & $PSCommandPath doctor; $null = Read-Host "Press Enter to continue..." }
-            "10" { & $PSCommandPath setup; $null = Read-Host "Press Enter to continue..." }
+            "9" { & $PSCommandPath doctor; $null = Read-Host "Press Enter to continue..."; return }
+            "10" { & $PSCommandPath setup; $null = Read-Host "Press Enter to continue..."; return }
             "0" { return }
             default { Write-Host "Choose a number from 0 to 10." -ForegroundColor Yellow }
         }

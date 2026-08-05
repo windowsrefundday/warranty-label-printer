@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("menu", "help", "setup", "doctor", "printer", "safe", "cli", "web", "verify", "update", "update-download", "update-status", "rollback")]
+    [ValidateSet("menu", "help", "setup", "doctor", "printer", "safe", "cli", "web", "verify", "update", "update-download", "update-status", "update-reset", "rollback")]
     [string]$Command = "menu",
     [int]$Port = 9191,
     [switch]$Tunnel,
@@ -41,6 +41,7 @@ Commands:
   update   Check the signed application update channel
   update-download  Download and stage an eligible update for next launch
   update-status    Show managed installation and rollback state
+  update-reset     Reset blocked updater state and errors
   rollback         Return to the previous known-good application release
 "@
 }
@@ -71,9 +72,10 @@ function Invoke-Menu {
         Write-Host "  4. Check for updates"
         Write-Host "  5. Download and stage update"
         Write-Host "  6. Show update status"
-        Write-Host "  7. Roll back managed release"
-        Write-Host "  8. Run diagnostics"
-        Write-Host "  9. Run setup"
+        Write-Host "  7. Reset blocked update state"
+        Write-Host "  8. Roll back managed release"
+        Write-Host "  9. Run diagnostics"
+        Write-Host " 10. Run setup"
         Write-Host "  0. Exit"
         $choice = Read-Host "Select an option"
         switch ($choice) {
@@ -83,7 +85,8 @@ function Invoke-Menu {
             "4" { & $PSCommandPath update; Read-Host "Press Enter to continue" | Out-Null }
             "5" { & $PSCommandPath update-download; Read-Host "Press Enter to continue" | Out-Null }
             "6" { & $PSCommandPath update-status; Read-Host "Press Enter to continue" | Out-Null }
-            "7" {
+            "7" { & $PSCommandPath update-reset; Read-Host "Press Enter to continue" | Out-Null }
+            "8" {
                 $confirmation = Read-Host "Type ROLLBACK to confirm"
                 if ($confirmation -ceq "ROLLBACK") {
                     & $PSCommandPath rollback
@@ -92,10 +95,10 @@ function Invoke-Menu {
                 }
                 Read-Host "Press Enter to continue" | Out-Null
             }
-            "8" { & $PSCommandPath doctor; Read-Host "Press Enter to continue" | Out-Null }
-            "9" { & $PSCommandPath setup; Read-Host "Press Enter to continue" | Out-Null }
+            "9" { & $PSCommandPath doctor; Read-Host "Press Enter to continue" | Out-Null }
+            "10" { & $PSCommandPath setup; Read-Host "Press Enter to continue" | Out-Null }
             "0" { return }
-            default { Write-Host "Choose a number from 0 to 9." -ForegroundColor Yellow }
+            default { Write-Host "Choose a number from 0 to 10." -ForegroundColor Yellow }
         }
     }
 }
@@ -212,6 +215,11 @@ switch ($Command) {
     "update-status" {
         Require-Environment
         & $python "$PSScriptRoot\tools\launcher.py" status
+        exit $LASTEXITCODE
+    }
+    "update-reset" {
+        Require-Environment
+        & $python "$PSScriptRoot\tools\launcher.py" reset
         exit $LASTEXITCODE
     }
     "rollback" {

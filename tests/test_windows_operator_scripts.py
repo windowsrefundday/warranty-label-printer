@@ -43,7 +43,8 @@ class WindowsOperatorScriptTests(unittest.TestCase):
         self.assertIn("function Invoke-Menu", script)
         self.assertIn("1. Start CLI printer mode", script)
         self.assertIn("5. Download and stage update", script)
-        self.assertIn("7. Roll back managed release", script)
+        self.assertIn("7. Reset blocked update state", script)
+        self.assertIn("8. Roll back managed release", script)
         self.assertIn('& $PSCommandPath cli', script)
         self.assertIn('"menu" {', script)
 

@@ -78,6 +78,18 @@ class LauncherTests(unittest.TestCase):
                 with redirect_stderr(io.StringIO()):
                     self.assertEqual(launcher.status(), 1)
 
+    def test_reset_clears_blocked_versions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = UpdatePaths.from_root(Path(temporary))
+            paths.ensure()
+            state = UpdateState(failed_versions=["0.1.0"], last_error="boom")
+            state.save(paths)
+            with mock.patch.object(launcher, "_managed_root", return_value=paths):
+                self.assertEqual(launcher.reset(), 0)
+                reloaded = UpdateState.load(paths)
+                self.assertEqual(reloaded.failed_versions, [])
+                self.assertIsNone(reloaded.last_error)
+
 
 if __name__ == "__main__":
     unittest.main()

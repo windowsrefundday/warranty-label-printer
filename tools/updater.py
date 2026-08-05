@@ -616,7 +616,21 @@ def _release_dir(paths: UpdatePaths, version: str) -> Path:
     return paths.versions / version
 
 
-def activate(paths: UpdatePaths, version: str) -> UpdateState:
+def reset_blocked(paths: UpdatePaths) -> UpdateState:
+    """Clear all blocked versions and recorded errors from the updater state."""
+    paths.ensure()
+    with FileLock(paths.lock):
+        try:
+            state = UpdateState.load(paths)
+        except UpdateError:
+            state = UpdateState()
+        state.failed_versions.clear()
+        state.last_error = None
+        state.save(paths)
+        return state
+
+
+def activate(paths: UpdatePaths, version: str, *, force: bool = False) -> UpdateState:
     """Atomically make an already-validated version pending for next launch."""
     paths.ensure()
     with FileLock(paths.lock):
@@ -629,7 +643,10 @@ def activate(paths: UpdatePaths, version: str) -> UpdateState:
         if state.current_version is not None and _version(version) <= _version(state.current_version):
             raise UpdateError("Refusing to activate an older or equal release")
         if version in state.failed_versions:
-            raise UpdateError(f"Release {version} is locally blocked after a failed start")
+            if force:
+                state.failed_versions.remove(version)
+            else:
+                raise UpdateError(f"Release {version} is locally blocked after a failed start")
         state.previous_version = state.current_version
         state.pending_version = version
         state.last_error = None

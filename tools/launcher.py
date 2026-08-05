@@ -223,6 +223,7 @@ def download() -> int:
     paths = _managed_root()
     try:
         paths.ensure()
+        updater.reset_blocked(paths)
         state = _mark_checked(paths)
         manifest = _load_signed_manifest()
         eligible = updater.choose_update(manifest, state, updater.platform_target())
@@ -231,7 +232,7 @@ def download() -> int:
             print("No eligible application update is available.")
             return 0
         updater.prepare_and_install(paths, manifest, updater.platform_target())
-        updater.activate(paths, manifest.version)
+        updater.activate(paths, manifest.version, force=True)
         print(f"Downloaded and staged {manifest.version}; restart to apply it.")
         return 0
     except updater.UpdateError as exc:
@@ -267,6 +268,19 @@ def rollback() -> int:
         return 1
 
 
+def reset() -> int:
+    """Reset blocked updater state and errors; return 0 on success, else 1."""
+    paths = _managed_root()
+    try:
+        paths.ensure()
+        state = updater.reset_blocked(paths)
+        print(json.dumps(state.to_mapping(), indent=2, sort_keys=True))
+        return 0
+    except (OSError, updater.UpdateError) as exc:
+        print(f"Reset failed: {exc}", file=sys.stderr)
+        return 1
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     raw_arguments = list(argv if argv is not None else sys.argv[1:])
     parser = argparse.ArgumentParser(description="Warranty Label Printer stable launcher")
@@ -275,7 +289,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Application arguments intentionally pass through untouched.  Parsing
     # them as launcher options would reject normal flags such as --diagnose.
     run_parser.add_argument("arguments", nargs=argparse.REMAINDER)
-    handlers = {"check": check, "download": download, "status": status, "rollback": rollback}
+    handlers = {
+        "check": check,
+        "download": download,
+        "status": status,
+        "rollback": rollback,
+        "reset": reset,
+    }
     for command in handlers:
         subparsers.add_parser(command)
     args, passthrough = parser.parse_known_args(raw_arguments)

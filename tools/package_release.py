@@ -42,7 +42,9 @@ def _copy_tree(
     *,
     allow_symlinks: bool = False,
     symlink_root: Path | None = None,
+    active_directories: set[Path] | None = None,
 ) -> None:
+    active = active_directories if active_directories is not None else set()
     if source.is_symlink():
         if not allow_symlinks:
             raise PackageError(f"Refusing to package symlink: {source}")
@@ -58,19 +60,28 @@ def _copy_tree(
             destination,
             allow_symlinks=True,
             symlink_root=root,
+            active_directories=active,
         )
         return
     if source.is_dir():
+        resolved_source = source.resolve()
+        if resolved_source in active:
+            raise PackageError(f"Browser symlink re-enters an ancestor: {source}")
+        active.add(resolved_source)
         destination.mkdir(parents=True, exist_ok=True)
-        for child in source.iterdir():
-            if child.name in SKIP_NAMES:
-                continue
-            _copy_tree(
-                child,
-                destination / child.name,
-                allow_symlinks=allow_symlinks,
-                symlink_root=symlink_root,
-            )
+        try:
+            for child in source.iterdir():
+                if child.name in SKIP_NAMES:
+                    continue
+                _copy_tree(
+                    child,
+                    destination / child.name,
+                    allow_symlinks=allow_symlinks,
+                    symlink_root=symlink_root,
+                    active_directories=active,
+                )
+        finally:
+            active.remove(resolved_source)
         return
     if not source.is_file():
         raise PackageError(f"Release input is not a regular file: {source}")

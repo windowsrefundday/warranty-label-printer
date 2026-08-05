@@ -10,7 +10,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from tools.package_release import build_package
+from tools.package_release import PackageError, build_package
 from tools.sign_manifest import create_manifest
 from tools.updater import Manifest, UpdateError, platform_target
 
@@ -73,6 +73,30 @@ class ReleasePackagingTests(unittest.TestCase):
             )
             with zipfile.ZipFile(output) as bundle:
                 self.assertEqual(bundle.read("browsers/linked/marker"), b"browser")
+
+    def test_browser_symlink_cycles_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            (runtime / "python").write_text("runtime", encoding="utf-8")
+            browsers = root / "browsers"
+            browsers.mkdir()
+            try:
+                (browsers / "cycle").symlink_to(browsers, target_is_directory=True)
+            except (OSError, NotImplementedError) as exc:
+                if os.name == "nt":
+                    self.skipTest(f"symlinks unavailable: {exc}")
+                raise
+            with self.assertRaises(PackageError):
+                build_package(
+                    ROOT,
+                    "1.2.3",
+                    platform_target(),
+                    root / "release.zip",
+                    runtime=runtime,
+                    browsers=browsers,
+                )
 
     def test_signed_manifest_round_trips_through_verifier(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -88,6 +88,27 @@ is running. Set
 > If the error persists, reboot Windows and retry once. Do not delete the
 > `versions` directory.
 
+> **If the updater says `Release 0.1.0 is locally blocked after a failed
+> start`:** the download completed, but the first startup probe failed. The
+> launcher records that version as blocked to prevent an automatic retry loop.
+> Back up and reset only the updater state, then retry the download:
+>
+> ```powershell
+> $root = if ($env:WARRANTY_LABEL_UPDATE_ROOT) {
+>     $env:WARRANTY_LABEL_UPDATE_ROOT
+> } else {
+>     Join-Path $env:LOCALAPPDATA "WarrantyLabelPrinter\updates"
+> }
+> $stamp = Get-Date -Format yyyyMMdd-HHmmss
+> Copy-Item "$root\state.json" "$root\state.json.backup-$stamp"
+> Remove-Item "$root\state.json" -Force -ErrorAction SilentlyContinue
+> Remove-Item "$root\state.json.bak" -Force -ErrorAction SilentlyContinue
+> .\warranty-windows.ps1 update-download
+> .\.venv\Scripts\python.exe .\tools\launcher.py run -- --mode cli --printer tsc
+> ```
+>
+> Do not delete `versions` or `printer_binding.json`.
+
 ### Updating a legacy source installation
 
 The first managed release does not overwrite a legacy checkout or its local

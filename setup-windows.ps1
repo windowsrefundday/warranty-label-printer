@@ -1,5 +1,6 @@
 param(
-    [switch]$WithTunnelRuntime
+    [switch]$WithTunnelRuntime,
+    [string]$BrowserCaCert
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +19,8 @@ function Assert-LastCommand {
     }
 }
 
+Write-Host "Created by Joel Manuel for the VA 2026" -ForegroundColor Green
+Write-Host "Thanks to Steve, Anthony, Chris, and Ernes" -ForegroundColor Green
 Write-Host "Warranty Label Printer - Windows Setup" -ForegroundColor Green
 Write-Host "This creates a local Python environment and runs read-only checks."
 Write-Host "It will NOT print a label, calibrate a printer, or install a printer driver."
@@ -47,6 +50,9 @@ Write-Step 2 "Running the shared read-only setup"
 $setupArgs = @()
 if ($WithTunnelRuntime) {
     $setupArgs += "--with-tunnel-runtime"
+}
+if ($BrowserCaCert) {
+    $setupArgs += @("--browser-ca-cert", $BrowserCaCert)
 }
 & $pythonExe @pythonPrefix "$PSScriptRoot\tools\setup.py" @setupArgs
 Assert-LastCommand "Shared setup"

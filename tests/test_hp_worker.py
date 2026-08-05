@@ -6,10 +6,11 @@ import unittest
 from datetime import date, timedelta
 import typing
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from core.cache import WarrantyCache
 from core.models import AssetRecord, Entitlement, SourceConfidence, VendorType
+from core.vendors.browser_runtime import BrowserSession
 from core.vendors.hp_worker import HPBrowserWorker
 
 
@@ -159,6 +160,101 @@ class HPBrowserWorkerTests(unittest.TestCase):
         self.assertIs(first, preloaded)
         self.assertIsNot(second, preloaded)
         self.assertIsNone(self.worker._preloaded_page)
+
+    def test_startup_failure_returns_explicit_failure_without_hanging(self):
+        with patch.object(
+            self.worker, "_init_browser", side_effect=RuntimeError("no browser")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "no browser"):
+                self.worker.start()
+
+        started = time.monotonic()
+        result = self.worker.fetch_warranty("MXLTEST001")
+
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertEqual(result.source_confidence, SourceConfidence.UNVERIFIED_FAILED)
+        self.assertIn("no browser", result.lookup_error or "")
+        self.assertFalse(self.worker._running)
+
+    def test_lookup_started_during_startup_failure_resolves_without_hanging(self):
+        startup_entered = threading.Event()
+        release_startup = threading.Event()
+
+        def blocked_init_browser():
+            startup_entered.set()
+            self.assertTrue(release_startup.wait(timeout=2))
+            raise RuntimeError("no browser")
+
+        with patch.object(self.worker, "_init_browser", side_effect=blocked_init_browser):
+            start_errors: list[Exception] = []
+            starter = threading.Thread(
+                target=lambda: self._capture_exception(
+                    self.worker.start, start_errors
+                )
+            )
+            starter.start()
+            self.assertTrue(startup_entered.wait(timeout=2))
+
+            results: list[AssetRecord] = []
+            lookup = threading.Thread(
+                target=lambda: results.append(
+                    self.worker.fetch_warranty("MXLTEST002")
+                )
+            )
+            lookup.start()
+            deadline = time.monotonic() + 2
+            while "MXLTEST002" not in self.worker._in_flight:
+                if time.monotonic() >= deadline:
+                    self.fail("lookup was not registered before startup failed")
+                time.sleep(0.01)
+
+            release_startup.set()
+            lookup.join(timeout=2)
+            starter.join(timeout=2)
+
+        self.assertFalse(lookup.is_alive())
+        self.assertFalse(starter.is_alive())
+        self.assertEqual(len(start_errors), 1)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(
+            results[0].source_confidence, SourceConfidence.UNVERIFIED_FAILED
+        )
+        self.assertIn("no browser", results[0].lookup_error or "")
+
+    def test_restart_waits_for_new_browser_initialization(self):
+        self.worker._init_browser = lambda: None
+        self.worker.start()
+        self.worker.stop()
+
+        startup_entered = threading.Event()
+        release_startup = threading.Event()
+
+        def blocked_init_browser():
+            startup_entered.set()
+            self.assertTrue(release_startup.wait(timeout=2))
+
+        with patch.object(self.worker, "_init_browser", side_effect=blocked_init_browser):
+            start_errors: list[Exception] = []
+            starter = threading.Thread(
+                target=lambda: self._capture_exception(
+                    self.worker.start, start_errors
+                )
+            )
+            starter.start()
+            self.assertTrue(startup_entered.wait(timeout=2))
+            self.assertTrue(starter.is_alive())
+            release_startup.set()
+            starter.join(timeout=2)
+
+        self.assertFalse(starter.is_alive())
+        self.assertEqual(start_errors, [])
+
+    @staticmethod
+    def _capture_exception(callback, errors: list[Exception]) -> None:
+        try:
+            callback()
+        except Exception as exc:
+            errors.append(exc)
 
     def test_fresh_cache_hit_returns_immediately_and_schedules_refresh(self):
         record = self._make_record("MXLTEST010", "January 1, 2100", date.today().isoformat())
@@ -418,6 +514,19 @@ class HPBrowserWorkerTests(unittest.TestCase):
         self.assertTrue(fake_context.closed)
         self.assertTrue(fake_browser.closed)
         playwright.stop.assert_called_once()
+
+    def test_init_browser_uses_shared_runtime_and_records_selection(self):
+        browser = FakeBrowser()
+        session = BrowserSession(MagicMock(), browser, "Microsoft Edge")
+
+        with patch("core.vendors.hp_worker.start_browser", return_value=session):
+            with patch.object(self.worker, "_preload_portal"):
+                self.worker._init_browser()
+
+        self.assertEqual(self.worker._browser_runtime, "Microsoft Edge")
+        self.assertIs(self.worker._browser, browser)
+        self.assertIsNotNone(self.worker._context)
+        self.worker._cleanup()
 
 
 if __name__ == "__main__":

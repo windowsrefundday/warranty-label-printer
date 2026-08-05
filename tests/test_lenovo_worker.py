@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from core.cache import WarrantyCache
 from core.models import AssetRecord, Entitlement, SourceConfidence, VendorType
+from core.vendors.browser_runtime import BrowserSession
 from core.vendors.lenovo_worker import LenovoBrowserWorker
 
 
@@ -332,6 +333,19 @@ class LenovoBrowserWorkerTests(unittest.TestCase):
         self.assertTrue(fake_browser.closed)
         self.assertEqual(fake_context.closed_on_thread, worker_thread_id)
         self.assertEqual(fake_browser.closed_on_thread, worker_thread_id)
+
+    def test_init_browser_uses_shared_runtime_and_records_selection(self):
+        browser = FakeBrowser()
+        session = BrowserSession(MagicMock(), browser, "Google Chrome")
+
+        with patch("core.vendors.lenovo_worker.start_browser", return_value=session):
+            with patch.object(self.worker, "_preload_portal"):
+                self.worker._init_browser()
+
+        self.assertEqual(self.worker._browser_runtime, "Google Chrome")
+        self.assertIs(self.worker._browser, browser)
+        self.assertIsNotNone(self.worker._context)
+        self.worker._cleanup()
 
     def test_failed_lookup_reports_failure_at_completion(self):
         self.worker._scrape = lambda serial: self.worker._lookup_failed(serial, "portal down")

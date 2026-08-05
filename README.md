@@ -162,12 +162,25 @@ runtime:
 1. Confirms 64-bit Python 3.11+.
 2. Creates or refreshes `.venv` inside the repository.
 3. Installs pinned shared dependencies plus `pywin32`.
-4. Installs the Playwright Chromium browser used for vendor lookups.
+4. Attempts to install the Playwright Chromium browser used for vendor lookups.
 5. Runs read-only system, browser, storage, driver, and queue checks.
 
 It is safe to rerun setup after an update or interrupted dependency install.
 Node.js is not needed for this basic setup. To enable phone-camera tunnel mode,
 install Node.js LTS and rerun `.\setup-windows.ps1 -WithTunnelRuntime`.
+
+If a corporate HTTPS proxy blocks the Playwright browser download with a
+certificate-chain error, setup reports a warning and continues to diagnostics.
+On Windows, vendor workers then try the installed Microsoft Edge and Google
+Chrome browsers after bundled Chromium. If your organization provides a
+trusted proxy CA certificate, pass it only to the browser download stage:
+
+```powershell
+.\setup-windows.ps1 -BrowserCaCert C:\path\to\corporate-root.pem
+```
+
+Setup never disables TLS verification globally. If no browser runtime is
+available, live vendor lookups fail closed instead of fabricating warranty data.
 
 ### 5. Bind the USB printer
 

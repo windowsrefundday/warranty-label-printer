@@ -10,6 +10,7 @@ from typing import Callable, List, Optional
 
 from core.cache import WarrantyCache
 from core.models import AssetRecord, SourceConfidence, VendorType
+from core.vendors.browser_runtime import start_browser
 from core.vendors.hp_parser import parse_portal_text
 
 ProgressCallback = Callable[[str, int], None]
@@ -53,6 +54,7 @@ class HPBrowserWorker:
         self._ready = threading.Event()
         self._playwright = None
         self._browser = None
+        self._browser_runtime: Optional[str] = None
         self._context = None
         self._preloaded_page = None
         self._startup_error: Optional[Exception] = None
@@ -62,12 +64,17 @@ class HPBrowserWorker:
     # ------------------------------------------------------------------
     def start(self) -> None:
         """Start the worker thread and initialize the browser."""
-        self._running = True
+        with self._lock:
+            self._running = True
+            self._startup_error = None
+        self._ready.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         self._ready.wait()
-        if self._startup_error is not None:
-            raise self._startup_error
+        with self._lock:
+            startup_error = self._startup_error
+        if startup_error is not None:
+            raise startup_error
 
     def prewarm(self) -> None:
         """Block until the browser context is ready for the first lookup."""
@@ -75,7 +82,8 @@ class HPBrowserWorker:
 
     def stop(self) -> None:
         """Signal the worker to stop and close all browser resources."""
-        self._running = False
+        with self._lock:
+            self._running = False
         self._queue.put(None)
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=15)
@@ -101,6 +109,7 @@ class HPBrowserWorker:
             except Exception:
                 pass
             self._playwright = None
+        self._browser_runtime = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -127,10 +136,12 @@ class HPBrowserWorker:
 
     def _enqueue_refresh(self, serial: str) -> None:
         with self._lock:
+            if self._startup_error is not None or not self._running:
+                return
             if serial in self._in_flight:
                 return
             self._in_flight.add(serial)
-        self._queue.put(serial)
+            self._queue.put(serial)
 
     def _live_lookup(
         self,
@@ -139,22 +150,35 @@ class HPBrowserWorker:
     ) -> AssetRecord:
         future: concurrent.futures.Future[AssetRecord] = concurrent.futures.Future()
         already_in_flight = False
+        unavailable_error: Optional[str] = None
         with self._lock:
-            if progress_callback is not None:
-                self._progress_callbacks.setdefault(serial, []).append(
-                    progress_callback
+            if self._startup_error is not None or not self._running:
+                unavailable_error = str(
+                    self._startup_error or "HP browser worker is unavailable"
                 )
-            if serial in self._in_flight:
-                self._pending.setdefault(serial, []).append(future)
-                already_in_flight = True
             else:
-                self._in_flight.add(serial)
-                self._pending[serial] = [future]
+                if progress_callback is not None:
+                    self._progress_callbacks.setdefault(serial, []).append(
+                        progress_callback
+                    )
+                if serial in self._in_flight:
+                    self._pending.setdefault(serial, []).append(future)
+                    already_in_flight = True
+                else:
+                    self._in_flight.add(serial)
+                    self._pending[serial] = [future]
+                    # Keep registration and enqueueing under the same lock as
+                    # the availability check. A concurrent startup failure or
+                    # stop can then either resolve this future or observe that
+                    # no work should be queued.
+                    self._queue.put(serial)
+        if unavailable_error is not None:
+            self._emit_direct(progress_callback, "Lookup failed", 100)
+            return self._lookup_failed(serial, unavailable_error)
         if already_in_flight:
             self._notify(serial, "Joining lookup already in progress", 15)
             return future.result()
         self._notify(serial, "Queued for HP portal", 10)
-        self._queue.put(serial)
         return future.result()
 
     # ------------------------------------------------------------------
@@ -164,12 +188,15 @@ class HPBrowserWorker:
         try:
             self._init_browser()
         except Exception as exc:
-            self._startup_error = exc
+            with self._lock:
+                self._startup_error = exc
+                self._running = False
+            self._resolve_pending_failures(f"HP browser startup failed: {exc}")
             self._ready.set()
             return
         self._ready.set()
 
-        while self._running:
+        while self._is_running():
             try:
                 serial = self._queue.get(timeout=0.5)
             except queue.Empty:
@@ -178,24 +205,47 @@ class HPBrowserWorker:
                 break
             self._process(serial)
 
-    def _init_browser(self) -> None:
-        from playwright.sync_api import sync_playwright
+    def _is_running(self) -> bool:
+        with self._lock:
+            return self._running
 
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
+    def _resolve_pending_failures(self, error: str) -> None:
+        with self._lock:
+            pending = self._pending
+            callbacks = self._progress_callbacks
+            self._pending = {}
+            self._progress_callbacks = {}
+            self._in_flight.clear()
+        for serial, futures in pending.items():
+            result = self._lookup_failed(serial, error)
+            for callback in callbacks.get(serial, []):
+                self._emit_direct(callback, "Lookup failed", 100)
+            for future in futures:
+                if not future.done():
+                    future.set_result(result)
+
+    def _init_browser(self) -> None:
+        session = start_browser(
             headless=self._headless,
             args=["--disable-blink-features=AutomationControlled"],
         )
-        self._context = self._browser.new_context(
-            locale="en-US",
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/126.0.0.0 Safari/537.36"
-            ),
-        )
-        if self._preload_enabled:
-            self._preload_portal()
+        self._playwright = session.playwright
+        self._browser = session.browser
+        self._browser_runtime = session.runtime
+        try:
+            self._context = self._browser.new_context(
+                locale="en-US",
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                ),
+            )
+            if self._preload_enabled:
+                self._preload_portal()
+        except Exception:
+            self._cleanup()
+            raise
 
     def _preload_portal(self) -> None:
         """Keep one unused HP form ready for the first live lookup."""
@@ -361,7 +411,7 @@ class HPBrowserWorker:
         return "Active"
 
     @staticmethod
-    def _lookup_failed(serial: str) -> AssetRecord:
+    def _lookup_failed(serial: str, error: Optional[str] = None) -> AssetRecord:
         return AssetRecord(
             serial_number=serial,
             vendor=VendorType.HP,
@@ -372,7 +422,7 @@ class HPBrowserWorker:
             entitlements=[],
             source_confidence=SourceConfidence.UNVERIFIED_FAILED,
             raw_source="HP Warranty Portal Lookup Failed",
-            lookup_error="HP did not return a complete warranty result",
+            lookup_error=error or "HP did not return a complete warranty result",
         )
 
     @staticmethod

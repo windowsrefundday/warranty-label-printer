@@ -146,6 +146,9 @@ def main():
         print_diagnostic_report(build_diagnostic_report())
         return
 
+    print("Created by Joel Manuel for the VA 2026")
+    print("Thanks to Steve, Anthony, Chris, and Ernes")
+
     if args.setup_printer:
         engine = WarrantyEngine()
         connector = engine.connectors.get("tsc")

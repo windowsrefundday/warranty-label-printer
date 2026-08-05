@@ -19,6 +19,7 @@ function Assert-LastCommand {
     }
 }
 
+Write-Host "Created by Joel Manuel for the VA 2026" -ForegroundColor Green
 Write-Host "Warranty Label Printer - Windows Setup" -ForegroundColor Green
 Write-Host "This creates a local Python environment and runs read-only checks."
 Write-Host "It will NOT print a label, calibrate a printer, or install a printer driver."

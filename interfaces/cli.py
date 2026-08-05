@@ -22,6 +22,7 @@ def run_cli_mode(initial_connector: str | None = None):
     printing = "ENABLED" if engine.active_connector_key == "tsc" else "DISABLED (Virtual File Output Only)"
     print("\n" + "=" * 60)
     print("  UNIVERSAL WARRANTY LOOKUP (CLI MODE)")
+    print("  Created by Joel Manuel for the VA 2026")
     print("=" * 60)
     print(f"  Physical Printing   : {printing}")
     print(f"  Active Output Driver: {engine.get_active_connector().connector_name}")

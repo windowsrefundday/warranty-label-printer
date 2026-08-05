@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+printf '%s\n' "Created by Joel Manuel for the VA 2026"
+
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 SETUP_ARGS=()
 if [[ "${1:-}" == "--with-tunnel-runtime" ]]; then

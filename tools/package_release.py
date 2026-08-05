@@ -80,7 +80,12 @@ def _write_zip(source: Path, output: Path) -> None:
                 info.date_time = (1980, 1, 1, 0, 0, 0)
                 mode = stat.S_IMODE(path.stat().st_mode)
                 info.external_attr = (stat.S_IFREG | mode) << 16
-                bundle.writestr(info, path.read_bytes())
+                bundle.writestr(
+                    info,
+                    path.read_bytes(),
+                    compress_type=zipfile.ZIP_DEFLATED,
+                    compresslevel=9,
+                )
         os.replace(temporary, output)
     finally:
         temporary.unlink(missing_ok=True)
@@ -135,6 +140,7 @@ def build_package(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Build a managed-release ZIP from command-line arguments."""
     parser = argparse.ArgumentParser(description="Build a managed release ZIP")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--version", required=True)

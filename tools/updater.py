@@ -273,51 +273,39 @@ class UpdateState:
     failed_versions: list[str] = field(default_factory=list)
 
     @classmethod
+    def _parse(cls, path: Path) -> "UpdateState":
+        """Parse and validate one durable update-state document."""
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(document, Mapping):
+            raise ValueError
+        if document.get("schema_version") != 1:
+            raise ValueError
+        state = cls(
+            install_id=str(document.get("install_id") or uuid.uuid4().hex),
+            current_version=document.get("current_version"),
+            previous_version=document.get("previous_version"),
+            pending_version=document.get("pending_version"),
+            last_check=document.get("last_check"),
+            last_error=document.get("last_error"),
+            failed_versions=[str(v) for v in document.get("failed_versions", [])],
+        )
+        for version in (state.current_version, state.previous_version, state.pending_version):
+            if version is not None:
+                _version(version)
+        return state
+
+    @classmethod
     def load(cls, paths: UpdatePaths) -> "UpdateState":
         if not paths.state.exists():
             return cls()
         try:
-            document = json.loads(paths.state.read_text(encoding="utf-8"))
-            if not isinstance(document, Mapping):
-                raise ValueError
-            if document.get("schema_version") != 1:
-                raise ValueError
-            state = cls(
-                install_id=str(document.get("install_id") or uuid.uuid4().hex),
-                current_version=document.get("current_version"),
-                previous_version=document.get("previous_version"),
-                pending_version=document.get("pending_version"),
-                last_check=document.get("last_check"),
-                last_error=document.get("last_error"),
-                failed_versions=[str(v) for v in document.get("failed_versions", [])],
-            )
-            for version in (state.current_version, state.previous_version, state.pending_version):
-                if version is not None:
-                    _version(version)
-            return state
-        except (OSError, json.JSONDecodeError, TypeError, ValueError, UpdateError) as exc:
+            return cls._parse(paths.state)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError, UpdateError):
             backup = paths.state.with_name(paths.state.name + ".bak")
             try:
-                document = json.loads(backup.read_text(encoding="utf-8"))
-                if not isinstance(document, Mapping):
-                    raise ValueError
-                if document.get("schema_version") != 1:
-                    raise ValueError
-                recovered = cls(
-                    install_id=str(document.get("install_id") or uuid.uuid4().hex),
-                    current_version=document.get("current_version"),
-                    previous_version=document.get("previous_version"),
-                    pending_version=document.get("pending_version"),
-                    last_check=document.get("last_check"),
-                    last_error=document.get("last_error"),
-                    failed_versions=[str(v) for v in document.get("failed_versions", [])],
-                )
-                for version in (recovered.current_version, recovered.previous_version, recovered.pending_version):
-                    if version is not None:
-                        _version(version)
-                return recovered
-            except (OSError, json.JSONDecodeError, TypeError, ValueError, UpdateError) as backup_exc:
-                raise UpdateError("Update state is corrupt; refusing to change releases") from backup_exc
+                return cls._parse(backup)
+            except (OSError, json.JSONDecodeError, TypeError, ValueError, UpdateError) as exc:
+                raise UpdateError("Update state is corrupt; refusing to change releases") from exc
 
     def save(self, paths: UpdatePaths) -> None:
         _atomic_json_write(paths.state, self.to_mapping())
@@ -428,7 +416,8 @@ def fetch_manifest(
     timeout: float = 15.0,
 ) -> dict[str, Any]:
     """Fetch a bounded HTTPS manifest; signature verification is separate."""
-    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    safe_url = _safe_url(url)
+    request = urllib.request.Request(safe_url, headers={"Accept": "application/json"})
     try:
         fetch = opener or urllib.request.urlopen
         with fetch(request, timeout=timeout) as response:
@@ -549,6 +538,7 @@ def extract_archive(archive: Path, destination: Path) -> Path:
             if len(infos) > MAX_ARCHIVE_FILES:
                 raise UpdateError("Update archive contains too many files")
             total = 0
+            written = 0
             names: set[str] = set()
             for info in infos:
                 _validate_member(info)
@@ -567,7 +557,14 @@ def extract_archive(archive: Path, destination: Path) -> Path:
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with bundle.open(info) as source, target.open("wb") as sink:
-                    shutil.copyfileobj(source, sink, length=1024 * 1024)
+                    while True:
+                        block = source.read(1024 * 1024)
+                        if not block:
+                            break
+                        written += len(block)
+                        if written > MAX_ARCHIVE_BYTES:
+                            raise UpdateError("Update archive is too large when extracted")
+                        sink.write(block)
                 mode = (info.external_attr >> 16) & 0o777
                 if mode:
                     os.chmod(target, mode)
@@ -638,6 +635,8 @@ def mark_healthy(paths: UpdatePaths, version: str) -> UpdateState:
 
 def prune_versions(paths: UpdatePaths, state: UpdateState, keep: int = 2) -> None:
     """Remove only obsolete managed release directories, never active versions."""
+    if not paths.versions.is_dir():
+        return
     protected = {
         version
         for version in (state.current_version, state.previous_version, state.pending_version)
@@ -688,7 +687,7 @@ def prepare_and_install(
     paths.ensure()
     target = manifest.target_for(target_name)
     if (paths.versions / manifest.version).exists():
-            return paths.versions / manifest.version
+        return paths.versions / manifest.version
     with FileLock(paths.lock):
         if (paths.versions / manifest.version).exists():
             return paths.versions / manifest.version

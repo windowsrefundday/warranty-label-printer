@@ -133,7 +133,9 @@ switch ($Command) {
         if ($Tunnel) {
             $webArgs += "--tunnel"
         }
-        $webArgs += $ExtraArgs
+        if ($ExtraArgs) {
+            $webArgs += $ExtraArgs
+        }
         & $python "$PSScriptRoot\tools\launcher.py" @webArgs
         exit $LASTEXITCODE
     }

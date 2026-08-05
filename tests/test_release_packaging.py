@@ -1,9 +1,11 @@
 import base64
 import hashlib
+import io
 import json
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stderr
 from unittest import mock
 from pathlib import Path
 
@@ -51,6 +53,15 @@ class ReleasePackagingTests(unittest.TestCase):
                 process.assert_called_once()
                 self.assertEqual(process.call_args.args[0][-1], "download")
 
+    def test_launcher_status_fails_safely_when_state_is_corrupt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = UpdatePaths.from_root(Path(temporary))
+            paths.state.parent.mkdir(parents=True, exist_ok=True)
+            paths.state.write_text("{", encoding="utf-8")
+            with mock.patch.object(launcher, "_managed_root", return_value=paths):
+                with redirect_stderr(io.StringIO()):
+                    self.assertEqual(launcher.status(), 1)
+
     def test_package_contains_marker_application_and_runtime(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -73,6 +84,10 @@ class ReleasePackagingTests(unittest.TestCase):
                 marker = json.loads(bundle.read("release.json"))
                 self.assertEqual(marker["version"], "1.2.3")
                 self.assertEqual(marker["target"], platform_target())
+                self.assertEqual(
+                    bundle.getinfo("runtime/python").compress_type,
+                    zipfile.ZIP_DEFLATED,
+                )
 
     def test_signed_manifest_round_trips_through_verifier(self):
         with tempfile.TemporaryDirectory() as temporary:

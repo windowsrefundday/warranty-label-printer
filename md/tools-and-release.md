@@ -20,8 +20,9 @@ The signing private key must remain outside the repository and be injected only
 into the protected release workflow. The public key is pinned in
 `tools/updater.py`; rotate it by overlapping old and new keys in a launcher
 release. Before enabling the tag workflow, configure the
-`UPDATE_SIGNING_KEY_B64` secret with the raw Ed25519 private key corresponding
-to the pinned public key; the signer refuses a mismatched key. Publish artifacts first and promote the signed manifest only after
+`UPDATE_SIGNING_KEY_B64` secret with the URL-safe Base64 encoding of exactly 32
+raw Ed25519 private-key bytes (Base64 padding is optional) corresponding to the
+pinned public key; the signer refuses a mismatched key. Publish artifacts first and promote the signed manifest only after
 clean Windows and macOS installation, restart, rollback, and safe-mode checks
 pass. Never use `git pull` or an in-place `.venv` mutation as the update path.
 

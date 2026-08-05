@@ -197,7 +197,12 @@ def download() -> int:
 
 def status() -> int:
     paths = _managed_root()
-    print(json.dumps(updater.UpdateState.load(paths).to_mapping(), indent=2, sort_keys=True))
+    try:
+        state = updater.UpdateState.load(paths)
+    except updater.UpdateError as exc:
+        print(f"Update status is unavailable: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(state.to_mapping(), indent=2, sort_keys=True))
     return 0
 
 
@@ -214,24 +219,26 @@ def rollback() -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     raw_arguments = list(argv if argv is not None else sys.argv[1:])
-    # Application arguments intentionally pass through untouched.  Parsing
-    # them as launcher options would reject normal flags such as --diagnose.
-    if raw_arguments and raw_arguments[0] == "run":
-        return run(raw_arguments[1:])
     parser = argparse.ArgumentParser(description="Warranty Label Printer stable launcher")
     subparsers = parser.add_subparsers(dest="command", required=True)
     run_parser = subparsers.add_parser("run")
+    # Application arguments intentionally pass through untouched.  Parsing
+    # them as launcher options would reject normal flags such as --diagnose.
     run_parser.add_argument("arguments", nargs=argparse.REMAINDER)
-    for command in ("check", "download", "status", "rollback"):
+    handlers = {"check": check, "download": download, "status": status, "rollback": rollback}
+    for command in handlers:
         subparsers.add_parser(command)
-    args = parser.parse_args(raw_arguments)
-    if args.command == "check":
-        return check()
-    if args.command == "download":
-        return download()
-    if args.command == "status":
-        return status()
-    return rollback()
+    args, passthrough = parser.parse_known_args(raw_arguments)
+    command_handlers = {**handlers, "run": lambda: run(args.arguments)}
+    if args.command == "run":
+        args.arguments.extend(passthrough)
+        passthrough = []
+    if passthrough:
+        parser.error(f"Unrecognized launcher arguments: {' '.join(passthrough)}")
+    handler = command_handlers.get(args.command)
+    if handler is None:
+        parser.error(f"Unsupported launcher command: {args.command}")
+    return handler()
 
 
 if __name__ == "__main__":

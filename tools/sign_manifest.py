@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Sequence
 
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -21,9 +22,7 @@ if str(ROOT) not in sys.path:
 from tools.updater import _canonical_json, _safe_url, _version
 
 
-def _private_key(value: str):
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
+def _private_key(value: str) -> Ed25519PrivateKey:
     try:
         raw = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
         return Ed25519PrivateKey.from_private_bytes(raw)
@@ -42,6 +41,7 @@ def create_manifest(
     now: datetime | None = None,
     lifetime_days: int = 14,
 ) -> dict[str, object]:
+    """Create a signed update manifest from release assets."""
     _version(version)
     _safe_url(base_url)
     current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -86,6 +86,7 @@ def verify_private_key_matches_pinned_key(key_id: str, private_key_b64: str) -> 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Sign a release manifest from command-line arguments."""
     parser = argparse.ArgumentParser(description="Sign application update metadata")
     parser.add_argument("--version", required=True)
     parser.add_argument("--channel", choices=("stable", "beta"), default="stable")

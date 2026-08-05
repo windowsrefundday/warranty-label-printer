@@ -16,11 +16,15 @@ def application_version() -> str:
     if explicit:
         return explicit
     module_path = Path(__file__).resolve()
-    release_root = (
-        module_path.parents[2]
-        if module_path.parents[1].name == "app"
-        else module_path.parents[1]
-    )
+    managed_root = os.environ.get("WARRANTY_LABEL_MANAGED_ROOT")
+    if managed_root:
+        release_root = Path(managed_root)
+    else:
+        release_root = (
+            module_path.parents[2]
+            if module_path.parents[1].name == "app"
+            else module_path.parents[1]
+        )
     marker = release_root / "release.json"
     try:
         document = json.loads(marker.read_text(encoding="utf-8"))

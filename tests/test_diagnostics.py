@@ -1,13 +1,32 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from core import diagnostics
 
 
 class BrowserDiagnosticsTests(unittest.TestCase):
-    def test_source_reports_development_version(self):
+    def test_source_reports_development_version(self) -> None:
         with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("WARRANTY_LABEL_APP_VERSION", None)
             self.assertEqual(diagnostics.application_version(), "0.0.0-dev")
+
+    def test_managed_root_marker_is_used_when_explicit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            Path(temporary, "release.json").write_text(
+                '{"version": "1.2.3"}', encoding="utf-8"
+            )
+            with patch.dict(
+                "os.environ",
+                {
+                    "WARRANTY_LABEL_APP_VERSION": "",
+                    "WARRANTY_LABEL_MANAGED_ROOT": temporary,
+                },
+                clear=False,
+            ):
+                self.assertEqual(diagnostics.application_version(), "1.2.3")
 
     def test_system_browser_is_reported_when_bundled_chromium_is_missing(self):
         result = diagnostics.subprocess.CompletedProcess(

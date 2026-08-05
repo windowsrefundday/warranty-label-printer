@@ -103,6 +103,12 @@ class UpdaterTests(unittest.TestCase):
             updater.Manifest.from_mapping(document)
 
     def test_redirect_downgrade_is_rejected(self):
+        with self.assertRaises(updater.UpdateError):
+            updater.fetch_manifest(
+                "http://updates.example.test/manifest.json",
+                opener=lambda *_args, **_kwargs: _Response(b"{}"),
+            )
+
         class RedirectResponse(_Response):
             def geturl(self):
                 return "http://updates.example.test/release.zip"
@@ -172,6 +178,9 @@ class UpdaterTests(unittest.TestCase):
             )
         with self.assertRaises(updater.UpdateError):
             updater.extract_archive(archive, self.root / "future-out")
+
+    def test_prune_is_safe_before_versions_directory_exists(self):
+        updater.prune_versions(self.paths, updater.UpdateState())
 
     def test_archive_preserves_runtime_executable_mode(self):
         archive = self.root / "mode.zip"

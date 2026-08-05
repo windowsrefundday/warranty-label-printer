@@ -47,7 +47,7 @@ class WarrantyCache:
     def _connect(self) -> sqlite3.Connection:
         # SQLite serializes access across threads by default. Each public method
         # creates a fresh short-lived connection and explicitly closes it.
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 

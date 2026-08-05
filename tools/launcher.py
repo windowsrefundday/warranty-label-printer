@@ -162,6 +162,7 @@ def _start_background_update_timer(
 def run(arguments: Sequence[str]) -> int:
     """Run the active release, falling back to a source checkout before migration."""
     paths = _managed_root()
+    clean_args = [arg for arg in arguments if arg != "--"]
     try:
         paths.ensure()
         _schedule_background_update_check(paths)
@@ -170,10 +171,10 @@ def run(arguments: Sequence[str]) -> int:
             release, _state = _release_for_launch(paths)
             if release is None:
                 executable = _source_python()
-                command = [str(executable), str(SOURCE_ROOT / "main.py"), *arguments]
+                command = [str(executable), str(SOURCE_ROOT / "main.py"), *clean_args]
                 return subprocess.call(command, cwd=str(SOURCE_ROOT))
             executable = _runtime_python(release)
-            return updater.run_child(paths, release, executable, arguments)
+            return updater.run_child(paths, release, executable, clean_args)
         finally:
             stop_event.set()
             timer_thread.join(timeout=1)

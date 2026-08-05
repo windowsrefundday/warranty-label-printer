@@ -36,15 +36,52 @@ APP_FILES = (
 SKIP_NAMES = {"__pycache__", ".pytest_cache", ".mypy_cache"}
 
 
-def _copy_tree(source: Path, destination: Path) -> None:
+def _copy_tree(
+    source: Path,
+    destination: Path,
+    *,
+    allow_symlinks: bool = False,
+    symlink_root: Path | None = None,
+    active_directories: set[Path] | None = None,
+) -> None:
+    active = active_directories if active_directories is not None else set()
     if source.is_symlink():
-        raise PackageError(f"Refusing to package symlink: {source}")
+        if not allow_symlinks:
+            raise PackageError(f"Refusing to package symlink: {source}")
+        root = (symlink_root or source.parent).resolve()
+        try:
+            resolved = source.resolve(strict=True)
+        except (OSError, RuntimeError) as exc:
+            raise PackageError(f"Browser symlink target is unavailable: {source}") from exc
+        if not resolved.is_relative_to(root):
+            raise PackageError(f"Browser symlink escapes its runtime: {source}")
+        _copy_tree(
+            resolved,
+            destination,
+            allow_symlinks=True,
+            symlink_root=root,
+            active_directories=active,
+        )
+        return
     if source.is_dir():
+        resolved_source = source.resolve()
+        if resolved_source in active:
+            raise PackageError(f"Browser symlink re-enters an ancestor: {source}")
+        active.add(resolved_source)
         destination.mkdir(parents=True, exist_ok=True)
-        for child in source.iterdir():
-            if child.name in SKIP_NAMES:
-                continue
-            _copy_tree(child, destination / child.name)
+        try:
+            for child in source.iterdir():
+                if child.name in SKIP_NAMES:
+                    continue
+                _copy_tree(
+                    child,
+                    destination / child.name,
+                    allow_symlinks=allow_symlinks,
+                    symlink_root=symlink_root,
+                    active_directories=active,
+                )
+        finally:
+            active.remove(resolved_source)
         return
     if not source.is_file():
         raise PackageError(f"Release input is not a regular file: {source}")
@@ -132,7 +169,12 @@ def build_package(
         if browsers is not None:
             if not browsers.is_dir() or browsers.is_symlink():
                 raise PackageError("Browser runtime must be a regular directory")
-            _copy_tree(browsers, staging / "browsers")
+            _copy_tree(
+                browsers,
+                staging / "browsers",
+                allow_symlinks=True,
+                symlink_root=browsers.resolve(),
+            )
         if node_modules is not None:
             _copy_tree(node_modules, staging / "app" / "node_modules")
         _write_zip(staging, output)

@@ -63,6 +63,36 @@ check is at least six hours old and repeats checks every six hours while the app
 is running. Set
 `WARRANTY_LABEL_UPDATE_MANIFEST_URL` only when using a private release mirror.
 
+### Updating a legacy source installation
+
+The first managed release does not overwrite a legacy checkout or its local
+configuration. Stop the application, back up the checkout and its data, then
+bootstrap the signed updater from a fresh `v0.1.0` source checkout:
+
+```powershell
+git clone --branch v0.1.0 https://github.com/WindowsRefundDay/warranty-label-printer.git warranty-label-printer-v0.1.0
+cd warranty-label-printer-v0.1.0
+git show-ref --verify --quiet refs/tags/v0.1.0
+git rev-parse --verify v0.1.0^{commit}
+.\warranty-windows.ps1 setup
+.\warranty-windows.ps1 update
+.\warranty-windows.ps1 update-download
+```
+
+Confirm the printed commit matches the commit shown for the trusted `v0.1.0`
+release before running setup. Restart with `.\warranty-windows.ps1 cli` (or
+`safe`). The download is staged and becomes active on the next launch. If a
+managed release fails its startup probe, managed rollback restores the previous
+known-good managed release; the source checkout is only a separate manual
+fallback. On macOS, use the same fresh checkout, run `./setup-macos.sh`, then
+`.venv/bin/python tools/launcher.py check` followed by `download`, and launch
+with `.venv/bin/python tools/launcher.py run ...`. The updater state is shared by
+legacy and fresh checkouts by default: Windows stores it under
+`%LOCALAPPDATA%\WarrantyLabelPrinter\updates`, macOS under
+`~/Library/Application Support/WarrantyLabelPrinter/updates`, or at the path
+set by `WARRANTY_LABEL_UPDATE_ROOT`. Keep that data directory in place so state
+and rollback history are preserved.
+
 ## License and vulnerability reports
 
 This independently owned project is released under the [Apache License 2.0](LICENSE).

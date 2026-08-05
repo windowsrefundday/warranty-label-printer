@@ -136,7 +136,7 @@ def _background_update_loop(
     while not stop_event.wait(UPDATE_CHECK_INTERVAL_SECONDS):
         try:
             _schedule_background_update_check(paths)
-        except updater.UpdateError:
+        except (OSError, updater.UpdateError):
             # A transient lock or state failure must not terminate the app.
             continue
 

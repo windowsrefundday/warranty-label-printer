@@ -52,9 +52,9 @@ def _copy_tree(
         try:
             resolved = source.resolve(strict=True)
         except (OSError, RuntimeError) as exc:
-            raise PackageError(f"Browser symlink target is unavailable: {source}") from exc
+            raise PackageError(f"Symlink target is unavailable: {source}") from exc
         if not resolved.is_relative_to(root):
-            raise PackageError(f"Browser symlink escapes its runtime: {source}")
+            raise PackageError(f"Symlink escapes its root: {source}")
         _copy_tree(
             resolved,
             destination,
@@ -66,7 +66,7 @@ def _copy_tree(
     if source.is_dir():
         resolved_source = source.resolve()
         if resolved_source in active:
-            raise PackageError(f"Browser symlink re-enters an ancestor: {source}")
+            raise PackageError(f"Symlink re-enters an ancestor: {source}")
         active.add(resolved_source)
         destination.mkdir(parents=True, exist_ok=True)
         try:
@@ -176,7 +176,14 @@ def build_package(
                 symlink_root=browsers.resolve(),
             )
         if node_modules is not None:
-            _copy_tree(node_modules, staging / "app" / "node_modules")
+            if not node_modules.is_dir() or node_modules.is_symlink():
+                raise PackageError("node_modules directory must be a regular directory")
+            _copy_tree(
+                node_modules,
+                staging / "app" / "node_modules",
+                allow_symlinks=True,
+                symlink_root=node_modules.resolve(),
+            )
         _write_zip(staging, output)
     return output
 

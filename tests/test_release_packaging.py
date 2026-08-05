@@ -98,6 +98,67 @@ class ReleasePackagingTests(unittest.TestCase):
                     browsers=browsers,
                 )
 
+    def test_node_modules_symlinks_are_dereferenced_inside_node_modules_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            (runtime / "python").write_text("runtime", encoding="utf-8")
+            node_modules = root / "node_modules"
+            real_pkg = node_modules / "localtunnel" / "bin"
+            real_pkg.mkdir(parents=True)
+            (real_pkg / "client.js").write_text("console.log('lt');", encoding="utf-8")
+            bin_dir = node_modules / ".bin"
+            bin_dir.mkdir(parents=True)
+            try:
+                (bin_dir / "lt").symlink_to(
+                    Path("..") / "localtunnel" / "bin" / "client.js"
+                )
+            except (OSError, NotImplementedError) as exc:
+                if os.name == "nt":
+                    self.skipTest(f"symlinks unavailable: {exc}")
+                raise
+            output = root / "release.zip"
+            build_package(
+                ROOT,
+                "1.2.3",
+                platform_target(),
+                output,
+                runtime=runtime,
+                node_modules=node_modules,
+            )
+            with zipfile.ZipFile(output) as bundle:
+                self.assertEqual(
+                    bundle.read("app/node_modules/.bin/lt"),
+                    b"console.log('lt');",
+                )
+
+    def test_node_modules_symlink_escaping_root_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            (runtime / "python").write_text("runtime", encoding="utf-8")
+            outside = root / "outside.txt"
+            outside.write_text("secret", encoding="utf-8")
+            node_modules = root / "node_modules"
+            node_modules.mkdir()
+            try:
+                (node_modules / "escaped").symlink_to(outside)
+            except (OSError, NotImplementedError) as exc:
+                if os.name == "nt":
+                    self.skipTest(f"symlinks unavailable: {exc}")
+                raise
+            with self.assertRaises(PackageError):
+                build_package(
+                    ROOT,
+                    "1.2.3",
+                    platform_target(),
+                    root / "release.zip",
+                    runtime=runtime,
+                    node_modules=node_modules,
+                )
+
     def test_signed_manifest_round_trips_through_verifier(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

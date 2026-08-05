@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 Set-Location -LiteralPath $PSScriptRoot
 
 Write-Host "Created by Joel Manuel for the VA 2026" -ForegroundColor Green
+Write-Host "Thanks to Steve, Anthony, Chris, and Ernes" -ForegroundColor Green
 
 $python = "$PSScriptRoot\.venv\Scripts\python.exe"
 if (-not (Test-Path -LiteralPath $python)) {

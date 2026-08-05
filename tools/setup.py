@@ -204,6 +204,7 @@ def run_setup(
 def main(argv: Sequence[str] | None = None) -> int:
     """Run setup for the host platform and return an operator-friendly status."""
     print("Created by Joel Manuel for the VA 2026")
+    print("Thanks to Steve, Anthony, Chris, and Ernes")
     parser = argparse.ArgumentParser(
         description="Set up the Warranty Label Printer safely."
     )

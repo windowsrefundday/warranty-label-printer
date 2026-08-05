@@ -23,6 +23,7 @@ def run_cli_mode(initial_connector: str | None = None):
     print("\n" + "=" * 60)
     print("  UNIVERSAL WARRANTY LOOKUP (CLI MODE)")
     print("  Created by Joel Manuel for the VA 2026")
+    print("  Thanks to Steve, Anthony, Chris, and Ernes")
     print("=" * 60)
     print(f"  Physical Printing   : {printing}")
     print(f"  Active Output Driver: {engine.get_active_connector().connector_name}")

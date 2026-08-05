@@ -142,6 +142,7 @@ def audit(root: Path = ROOT) -> list[str]:
 
 def main() -> int:
     print("Created by Joel Manuel for the VA 2026")
+    print("Thanks to Steve, Anthony, Chris, and Ernes")
     failures = audit()
     if failures:
         print("Release audit failed:")

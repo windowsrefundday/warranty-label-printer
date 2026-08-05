@@ -37,6 +37,11 @@ state pointer. The active checkout is never overwritten.
 - `rollback` returns to the previous known-good release without touching cache,
   labels, printer bindings, or profiles.
 
+Normal launcher startup performs a non-blocking signed check when the last check
+is at least six hours old. While the application remains open, the launcher
+repeats that check every six hours; a downloaded release is staged for the next
+launch.
+
 Updates are fail-closed. Expired metadata, unknown signing keys, downgrades,
 wrong platforms, corrupt archives, insufficient disk space, and failed startup
 probes do not replace the current release. The first managed installation still

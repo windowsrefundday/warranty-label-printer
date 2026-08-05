@@ -30,7 +30,7 @@ Dependency Review, CodeQL, Scorecard, and Zizmor as applicable.
   downloads, archive traversal limits, atomic state backups, lock contention,
   startup probes, activation, and rollback.
 - `test_release_packaging.py` covers deterministic managed ZIP contents,
-  launcher argument pass-through, daily background scheduling, and signed
+  launcher argument pass-through, six-hour background scheduling, and signed
   manifest generation.
 - `test_release_audit.py` protects the public-source boundary, including
   workflow action pinning.

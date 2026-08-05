@@ -7,11 +7,13 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
+UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 
@@ -46,7 +48,7 @@ def _reserve_background_check(paths: updater.UpdatePaths) -> bool:
                 elapsed = datetime.now(timezone.utc) - datetime.fromisoformat(
                     state.last_check.replace("Z", "+00:00")
                 )
-                if elapsed.total_seconds() < 24 * 60 * 60:
+                if elapsed.total_seconds() < UPDATE_CHECK_INTERVAL_SECONDS:
                     return False
             except ValueError:
                 pass
@@ -96,7 +98,7 @@ def _release_for_launch(paths: updater.UpdatePaths) -> tuple[Path | None, update
 
 
 def _schedule_background_update_check(paths: updater.UpdatePaths) -> None:
-    """Start a non-blocking signed check at most once per day."""
+    """Start a non-blocking signed check when the six-hour lease expires."""
     if os.environ.get("WARRANTY_LABEL_DISABLE_AUTO_UPDATE") == "1":
         return
     if not _reserve_background_check(paths):
@@ -127,19 +129,51 @@ def _schedule_background_update_check(paths: updater.UpdatePaths) -> None:
         return
 
 
+def _background_update_loop(
+    paths: updater.UpdatePaths, stop_event: threading.Event
+) -> None:
+    """Schedule signed checks every six hours while the launched app runs."""
+    while not stop_event.wait(UPDATE_CHECK_INTERVAL_SECONDS):
+        try:
+            _schedule_background_update_check(paths)
+        except updater.UpdateError:
+            # A transient lock or state failure must not terminate the app.
+            continue
+
+
+def _start_background_update_timer(
+    paths: updater.UpdatePaths,
+) -> tuple[threading.Event, threading.Thread]:
+    """Start the lifecycle-bound periodic update checker."""
+    stop_event = threading.Event()
+    thread = threading.Thread(
+        target=_background_update_loop,
+        args=(paths, stop_event),
+        name="warranty-update-checker",
+        daemon=True,
+    )
+    thread.start()
+    return stop_event, thread
+
+
 def run(arguments: Sequence[str]) -> int:
     """Run the active release, falling back to a source checkout before migration."""
     paths = _managed_root()
     try:
         paths.ensure()
         _schedule_background_update_check(paths)
-        release, _state = _release_for_launch(paths)
-        if release is None:
-            executable = _source_python()
-            command = [str(executable), str(SOURCE_ROOT / "main.py"), *arguments]
-            return subprocess.call(command, cwd=str(SOURCE_ROOT))
-        executable = _runtime_python(release)
-        return updater.run_child(paths, release, executable, arguments)
+        stop_event, timer_thread = _start_background_update_timer(paths)
+        try:
+            release, _state = _release_for_launch(paths)
+            if release is None:
+                executable = _source_python()
+                command = [str(executable), str(SOURCE_ROOT / "main.py"), *arguments]
+                return subprocess.call(command, cwd=str(SOURCE_ROOT))
+            executable = _runtime_python(release)
+            return updater.run_child(paths, release, executable, arguments)
+        finally:
+            stop_event.set()
+            timer_thread.join(timeout=1)
     except (OSError, updater.UpdateError) as exc:
         print(f"Managed update is unavailable; refusing unsafe launch: {exc}", file=sys.stderr)
         return 1

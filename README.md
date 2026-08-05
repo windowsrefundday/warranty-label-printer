@@ -58,7 +58,9 @@ SHA-256 digest before staging a release. It activates only on the next launch.
 If the new release fails its startup grace period, the stable launcher restores
 the previous version. Use `rollback` when an operator wants to return to the
 previous known-good release. Existing source checkouts can continue operating
-without an update channel; set
+without an update channel. The launcher checks on startup when the previous
+check is at least six hours old and repeats checks every six hours while the app
+is running. Set
 `WARRANTY_LABEL_UPDATE_MANIFEST_URL` only when using a private release mirror.
 
 ## License and vulnerability reports

@@ -1,2 +1,2 @@
 -r requirements.txt
-pywin32==311
+pywin32==312

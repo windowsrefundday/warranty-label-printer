@@ -30,8 +30,10 @@ class WindowsOperatorScriptTests(unittest.TestCase):
 
         self.assertIn("--printer file", script)
         self.assertIn("--printer tsc", script)
-        self.assertIn("main.py --diagnose", script)
-        self.assertIn("main.py --setup-printer", script)
+        self.assertIn("tools\\launcher.py\" run --diagnose", script)
+        self.assertIn("tools\\launcher.py\" run --setup-printer", script)
+        self.assertIn('"update-download"', script)
+        self.assertIn("if ($ExtraArgs)", script)
         self.assertIn("ValidateSet", script)
 
     def test_readme_leads_with_windows_and_documents_operator_helper(self) -> None:

@@ -1,13 +1,16 @@
 # Warranty Label Printer
 
-A source-only warranty lookup and label-printing tool for IT departments. Scan
+A source-first warranty lookup and label-printing tool for IT departments. Scan
 an HP or Lenovo serial number, verify warranty information against the vendor,
 and create a 3 × 1 inch TSC MB341 label. The same application runs on Windows
 and macOS; Windows 11 x64 is the primary supported deployment.
 
-There is no installer, packaged executable, or automatic driver download.
-Everything runs from the downloaded GitHub folder in an isolated Python
-environment.
+The source checkout remains usable as a transparent fallback, while managed
+installations can download signed application releases into isolated,
+versioned directories. Updates never replace the running checkout or its
+printer/runtime data, and a failed startup automatically returns to the last
+known-good release. The application never downloads or installs a printer
+driver.
 
 ## Public-release safety
 
@@ -31,6 +34,34 @@ HTTPS tunnel mode and the one-time QR pairing link. Do not port-forward the
 dashboard, expose the raw HTTP port, or paste pairing URLs into chat or public
 tickets. Stop the tunnel when finished and remember that a tunnel provider can
 observe traffic metadata.
+
+## Managed application updates
+
+After the normal setup, check for a signed application release:
+
+```powershell
+.\warranty-windows.ps1 update
+.\warranty-windows.ps1 update-download
+.\warranty-windows.ps1 update-status
+```
+
+On macOS, use the source environment for the same operations:
+
+```bash
+.venv/bin/python tools/launcher.py check
+.venv/bin/python tools/launcher.py download
+.venv/bin/python tools/launcher.py status
+```
+
+`download` verifies signed metadata, the platform target, archive size, and
+SHA-256 digest before staging a release. It activates only on the next launch.
+If the new release fails its startup grace period, the stable launcher restores
+the previous version. Use `rollback` when an operator wants to return to the
+previous known-good release. Existing source checkouts can continue operating
+without an update channel. The launcher checks on startup when the previous
+check is at least six hours old and repeats checks every six hours while the app
+is running. Set
+`WARRANTY_LABEL_UPDATE_MANIFEST_URL` only when using a private release mirror.
 
 ## License and vulnerability reports
 

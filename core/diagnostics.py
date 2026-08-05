@@ -14,6 +14,7 @@ from core.app_paths import get_app_paths
 from core.engine import WarrantyEngine
 from core.printers.tsc_connector import TSCPrinterConnector
 from core.vendors.browser_runtime import available_system_browsers
+from core.version import application_version
 
 
 def build_diagnostic_report(
@@ -35,6 +36,7 @@ def build_diagnostic_report(
         browser = _browser_status()
         return {
             "application": "Warranty Label Printer",
+            "version": application_version(),
             "platform": sys.platform,
             "os": platform.platform(),
             "architecture": platform.machine(),

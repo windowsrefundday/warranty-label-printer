@@ -88,6 +88,36 @@ is running. Set
 > If the error persists, reboot Windows and retry once. Do not delete the
 > `versions` directory.
 
+> **Resetting blocked updater state:** If the first launch of a downloaded release fails, the updater intentionally blocks that version to prevent crash loops. Reset only the updater state, preserving the downloaded version and printer binding:
+>
+> ```powershell
+> $root = if ($env:WARRANTY_LABEL_UPDATE_ROOT) {
+>     $env:WARRANTY_LABEL_UPDATE_ROOT
+> } else {
+>     Join-Path $env:LOCALAPPDATA "WarrantyLabelPrinter\updates"
+> }
+> 
+> $stamp = Get-Date -Format yyyyMMdd-HHmmss
+> Copy-Item "$root\state.json" "$root\state.json.backup-$stamp"
+> 
+> Remove-Item "$root\state.json" -Force -ErrorAction SilentlyContinue
+> Remove-Item "$root\state.json.bak" -Force -ErrorAction SilentlyContinue
+> ```
+>
+> Then retry:
+>
+> ```powershell
+> .\warranty-windows.ps1 update-download
+> ```
+>
+> Launch using the argument-forwarding workaround:
+>
+> ```powershell
+> .\.venv\Scripts\python.exe .\tools\launcher.py run -- --mode cli --printer tsc
+> ```
+>
+> Do not delete the `versions` directory or `printer_binding.json`.
+
 ### Updating a legacy source installation
 
 The first managed release does not overwrite a legacy checkout or its local

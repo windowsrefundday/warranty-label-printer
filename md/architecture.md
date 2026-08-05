@@ -1,8 +1,9 @@
 # Architecture
 
-The application is a source-only Python program with optional Node.js support
-for the HTTPS tunnel runtime. `main.py` composes the engine and selects the CLI
-or web interface.
+The application is a Python program with optional Node.js support for the HTTPS
+tunnel runtime. Source checkouts and managed release bundles use the same
+`main.py`; the stable launcher selects the active version before composing the
+CLI or web interface.
 
 ```text
 scanner / browser
@@ -25,7 +26,9 @@ scanner / browser
   browser plugins, and profile operations.
 - `tests/` owns standard-library `unittest` coverage and mocks external
   browsers, operating-system printer APIs, and queues.
-- `tools/` owns setup orchestration and publication-safety auditing.
+- `tools/` owns setup orchestration, publication-safety auditing, and the
+  signed managed-update launcher. `tools/updater.py` must remain independent of
+  application imports so a broken release cannot prevent recovery.
 - `.github/` owns automated validation and dependency/security checks.
 
 Keep platform-specific code behind injected discovery and transport contracts.

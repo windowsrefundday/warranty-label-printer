@@ -20,4 +20,5 @@ then sends that record to an explicitly selected output connector.
 
 The community engine updater remains intentionally unchanged and is tracked as
 a separate hardening decision. Do not silently install remote code from a new
-feature or test.
+feature or test. The signed application updater in `tools/` is a separate
+release mechanism and never invokes or modifies the community engine updater.

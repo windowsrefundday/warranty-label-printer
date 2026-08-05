@@ -5,6 +5,10 @@ from core import diagnostics
 
 
 class BrowserDiagnosticsTests(unittest.TestCase):
+    def test_source_reports_development_version(self):
+        with patch.dict("os.environ", {}, clear=False):
+            self.assertEqual(diagnostics.application_version(), "0.0.0-dev")
+
     def test_system_browser_is_reported_when_bundled_chromium_is_missing(self):
         result = diagnostics.subprocess.CompletedProcess(
             args=["playwright"],

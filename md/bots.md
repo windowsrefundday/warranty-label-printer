@@ -24,6 +24,12 @@ permissions.
 - CodeRabbit is an external pull-request reviewer; draft pull requests may be
   skipped by that integration.
 
+The tag-driven release workflow builds platform-specific managed artifacts,
+including a copied Python runtime, and signs the update manifest with the
+protected release key. It must keep release publication separate from ordinary
+read-only verification and may not publish metadata until clean-install,
+upgrade, and rollback checks pass.
+
 Do not add secrets, broad write permissions, mutable action tags, or silent
 remote code installation to a workflow. Update `tools/release_audit.py` tests
 when introducing a new workflow reference pattern.

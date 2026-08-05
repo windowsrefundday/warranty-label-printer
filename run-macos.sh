@@ -12,4 +12,4 @@ if [[ ! -x ".venv/bin/python" ]]; then
   exit 1
 fi
 
-exec .venv/bin/python main.py --mode cli "$@"
+exec .venv/bin/python tools/launcher.py run --mode cli "$@"

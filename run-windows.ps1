@@ -9,5 +9,5 @@ if (-not (Test-Path -LiteralPath $python)) {
     throw "Missing .venv. Run .\setup-windows.ps1 first."
 }
 
-& $python main.py --mode cli @args
+& $python "$PSScriptRoot\tools\launcher.py" run --mode cli @args
 exit $LASTEXITCODE

@@ -23,6 +23,27 @@ printer, or download a driver.
 - Safe virtual output: select `file` when physical printer validation is not
   complete.
 
+## Managed application updates
+
+The stable launcher in `tools/launcher.py` is deliberately outside the managed
+application directory. It stores signed releases under the per-user update
+directory, with one immutable directory per version and an atomically replaced
+state pointer. The active checkout is never overwritten.
+
+- `check` fetches and verifies the HTTPS manifest and Ed25519 signature.
+- `download` verifies the target size and SHA-256 digest, rejects unsafe ZIP
+  paths, extracts to staging, and marks the release pending for the next start.
+- `status` reports the current, pending, previous, and locally blocked releases.
+- `rollback` returns to the previous known-good release without touching cache,
+  labels, printer bindings, or profiles.
+
+Updates are fail-closed. Expired metadata, unknown signing keys, downgrades,
+wrong platforms, corrupt archives, insufficient disk space, and failed startup
+probes do not replace the current release. The first managed installation still
+requires the existing setup flow so the bootstrap environment is explicit.
+Set `WARRANTY_LABEL_DISABLE_AUTO_UPDATE=1` for an offline or centrally managed
+machine; manual `check` and `download` commands remain available.
+
 Runtime caches, bindings, profiles, labels, and CSV exports belong in the
 per-user application data directory. They must not be copied into the
 checkout, committed, or attached to public support requests.

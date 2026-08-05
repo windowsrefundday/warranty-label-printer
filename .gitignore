@@ -2,6 +2,10 @@
 node_modules/
 __pycache__/
 *.py[cod]
+build/
+dist/
+*.partial
+*.zip
 
 # Operator data and credentials
 .env

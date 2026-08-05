@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("help", "setup", "doctor", "printer", "safe", "cli", "web", "verify")]
+    [ValidateSet("help", "setup", "doctor", "printer", "safe", "cli", "web", "verify", "update", "update-download", "update-status", "rollback")]
     [string]$Command = "help",
     [int]$Port = 9191,
     [switch]$Tunnel,
@@ -37,6 +37,10 @@ Commands:
   cli      Start normal scanner mode; physical output requires a valid binding
   web      Start the browser interface; add -Tunnel for secure phone camera use
   verify   Run unit tests, compilation, and Pyright when Node.js is available
+  update   Check the signed application update channel
+  update-download  Download and stage an eligible update for next launch
+  update-status    Show managed installation and rollback state
+  rollback         Return to the previous known-good application release
 "@
 }
 
@@ -70,7 +74,7 @@ switch ($Command) {
     }
     "doctor" {
         Require-Environment
-        $diagnosticText = (& $python main.py --diagnose | Out-String)
+        $diagnosticText = (& $python "$PSScriptRoot\tools\launcher.py" run --diagnose | Out-String)
         Assert-ExitCode "Diagnostics"
         $diagnostic = $diagnosticText | ConvertFrom-Json
 
@@ -110,27 +114,27 @@ switch ($Command) {
     }
     "printer" {
         Require-Environment
-        & $python main.py --setup-printer
+        & $python "$PSScriptRoot\tools\launcher.py" run --setup-printer
         exit $LASTEXITCODE
     }
     "safe" {
         Require-Environment
-        & $python main.py --mode cli --printer file @ExtraArgs
+        & $python "$PSScriptRoot\tools\launcher.py" run --mode cli --printer file @ExtraArgs
         exit $LASTEXITCODE
     }
     "cli" {
         Require-Environment
-        & $python main.py --mode cli --printer tsc @ExtraArgs
+        & $python "$PSScriptRoot\tools\launcher.py" run --mode cli --printer tsc @ExtraArgs
         exit $LASTEXITCODE
     }
     "web" {
         Require-Environment
-        $webArgs = @("main.py", "--mode", "web", "--port", $Port)
+        $webArgs = @("run", "--mode", "web", "--port", $Port)
         if ($Tunnel) {
             $webArgs += "--tunnel"
         }
         $webArgs += $ExtraArgs
-        & $python @webArgs
+        & $python "$PSScriptRoot\tools\launcher.py" @webArgs
         exit $LASTEXITCODE
     }
     "verify" {
@@ -149,5 +153,25 @@ switch ($Command) {
             Write-Host "Skipped Pyright because npx is not installed." -ForegroundColor Yellow
         }
         Write-Host "Verification completed." -ForegroundColor Green
+    }
+    "update" {
+        Require-Environment
+        & $python "$PSScriptRoot\tools\launcher.py" check
+        exit $LASTEXITCODE
+    }
+    "update-download" {
+        Require-Environment
+        & $python "$PSScriptRoot\tools\launcher.py" download
+        exit $LASTEXITCODE
+    }
+    "update-status" {
+        Require-Environment
+        & $python "$PSScriptRoot\tools\launcher.py" status
+        exit $LASTEXITCODE
+    }
+    "rollback" {
+        Require-Environment
+        & $python "$PSScriptRoot\tools\launcher.py" rollback
+        exit $LASTEXITCODE
     }
 }
